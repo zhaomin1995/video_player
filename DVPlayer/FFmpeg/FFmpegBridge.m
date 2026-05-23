@@ -209,7 +209,7 @@
     }
 
     AVDictionary *opts = NULL;
-    av_dict_set(&opts, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0);
+    av_dict_set(&opts, "movflags", "faststart", 0);
 
     ret = avformat_write_header(ofmt_ctx, &opts);
     av_dict_free(&opts);

@@ -59,7 +59,7 @@ class SeekSliderView: NSView {
 
         // Track background
         let trackRect = NSRect(x: trackX, y: trackY, width: trackWidth, height: currentTrackHeight)
-        context.setFillColor(NSColor.white.withAlphaComponent(0.2).cgColor)
+        context.setFillColor(NSColor.white.withAlphaComponent(0.3).cgColor)
         let bgPath = NSBezierPath(roundedRect: trackRect, xRadius: currentTrackHeight / 2, yRadius: currentTrackHeight / 2)
         bgPath.fill()
 
@@ -68,7 +68,7 @@ class SeekSliderView: NSView {
         let fillWidth = trackWidth * currentProgress
         if fillWidth > 0 {
             let fillRect = NSRect(x: trackX, y: trackY, width: fillWidth, height: currentTrackHeight)
-            context.setFillColor(NSColor.white.cgColor)
+            context.setFillColor(NSColor.systemBlue.cgColor)
             let fillPath = NSBezierPath(roundedRect: fillRect, xRadius: currentTrackHeight / 2, yRadius: currentTrackHeight / 2)
             fillPath.fill()
         }

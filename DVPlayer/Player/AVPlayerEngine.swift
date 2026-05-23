@@ -15,13 +15,19 @@ class AVPlayerEngine: NSObject {
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
     private var rateObservation: NSKeyValueObservation?
+    private var itemStatusObservation: NSKeyValueObservation?
 
     var isPlaying: Bool {
         player?.rate != 0
     }
 
+    private var cachedDuration: Double = 0
+
     var duration: Double {
-        playerItem?.duration.seconds ?? 0
+        if cachedDuration > 0 { return cachedDuration }
+        let d = playerItem?.duration.seconds ?? 0
+        if d.isFinite && d > 0 { cachedDuration = d }
+        return cachedDuration
     }
 
     var currentTime: Double {
@@ -67,6 +73,19 @@ class AVPlayerEngine: NSObject {
         setupTimeObserver()
         setupNotifications()
         observeStatus()
+        observeItemStatus()
+
+        Task {
+            if let dur = try? await asset.load(.duration) {
+                let secs = dur.seconds
+                if secs.isFinite && secs > 0 {
+                    await MainActor.run {
+                        self.cachedDuration = secs
+                        self.delegate?.playerEngineTimeDidChange(current: 0, duration: secs)
+                    }
+                }
+            }
+        }
     }
 
     func play() {
@@ -86,6 +105,7 @@ class AVPlayerEngine: NSObject {
         }
         statusObservation = nil
         rateObservation = nil
+        itemStatusObservation = nil
         player?.pause()
         player = nil
         playerItem = nil
@@ -137,6 +157,19 @@ class AVPlayerEngine: NSObject {
         rateObservation = player?.observe(\.rate, options: [.new]) { [weak self] player, _ in
             DispatchQueue.main.async {
                 self?.delegate?.playerEngineDidUpdateStatus(isPlaying: player.rate != 0)
+            }
+        }
+    }
+
+    private func observeItemStatus() {
+        itemStatusObservation = playerItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
+            guard let self = self, item.status == .readyToPlay else { return }
+            let dur = item.duration.seconds
+            if dur.isFinite && dur > 0 {
+                DispatchQueue.main.async {
+                    self.cachedDuration = dur
+                    self.delegate?.playerEngineTimeDidChange(current: self.currentTime, duration: dur)
+                }
             }
         }
     }

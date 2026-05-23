@@ -14,7 +14,7 @@ class ControlBarView: NSView {
     weak var delegate: ControlBarDelegate?
 
     private let gradientView = GradientScrimView()
-    private let effectView = NSVisualEffectView()
+    private let effectView = NSView()
     private let seekSlider = SeekSliderView()
     private let playbackButtons = PlaybackButtons()
     private let currentTimeLabel = NSTextField(labelWithString: "0:00")
@@ -41,14 +41,10 @@ class ControlBarView: NSView {
         gradientView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(gradientView)
 
-        // Dark solid background with slight transparency
-        effectView.material = .dark
-        effectView.blendingMode = .behindWindow
-        effectView.state = .active
         effectView.wantsLayer = true
         effectView.layer?.cornerRadius = 10
         effectView.layer?.masksToBounds = true
-        effectView.layer?.backgroundColor = NSColor(white: 0.08, alpha: 0.92).cgColor
+        effectView.layer?.backgroundColor = NSColor(white: 0.1, alpha: 0.95).cgColor
         effectView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(effectView)
 
