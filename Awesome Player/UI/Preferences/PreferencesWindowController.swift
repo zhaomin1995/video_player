@@ -458,34 +458,33 @@ extension NSView {
     }
 
     func embed(_ stack: NSStackView) {
-        let scrollView = NSScrollView()
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        // Use frame-based layout for the scroll view document — Auto Layout
+        // inside NSScrollView.documentView is notoriously broken for sizing.
+        let scrollView = NSScrollView(frame: bounds)
+        scrollView.autoresizingMask = [.width, .height]
         scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
         scrollView.drawsBackground = false
 
         let container = FlippedView()
-        container.addSubview(stack)
         scrollView.documentView = container
         addSubview(scrollView)
 
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+        // Build stack with frame-based layout inside container
+        stack.translatesAutoresizingMaskIntoConstraints = true
+        container.addSubview(stack)
 
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12),
-        ])
-
-        // Size container to scroll view width after layout
-        DispatchQueue.main.async {
+        // Relayout when the view appears and when the tab is selected
+        let layout = { [weak self] in
+            guard let self = self else { return }
             let w = scrollView.contentSize.width
-            stack.frame.size.width = w - 40
-            container.frame = NSRect(x: 0, y: 0, width: w, height: stack.fittingSize.height + 24)
+            stack.frame = NSRect(x: 20, y: 12, width: w - 40, height: 0)
+            stack.frame.size.height = stack.fittingSize.height
+            container.frame = NSRect(x: 0, y: 0, width: w, height: stack.frame.maxY + 12)
         }
+
+        DispatchQueue.main.async { layout() }
+        // Also relayout when the tab becomes visible
+        NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main) { _ in layout() }
     }
 
     func addSectionHeader(_ stack: NSStackView, _ title: String) {
@@ -512,9 +511,8 @@ extension NSView {
 
         let lbl = NSTextField(labelWithString: label)
         lbl.font = .systemFont(ofSize: 12)
-        lbl.lineBreakMode = .byWordWrapping
-        lbl.setContentCompressionResistancePriority(.required, for: .horizontal)
-        lbl.widthAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
+        lbl.lineBreakMode = .byTruncatingTail
+        lbl.widthAnchor.constraint(equalToConstant: 300).isActive = true
 
         row.addArrangedSubview(lbl)
         row.addArrangedSubview(control)
