@@ -140,6 +140,31 @@ class PlayerViewController: NSViewController {
         }
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard let chars = event.charactersIgnoringModifiers else { return super.performKeyEquivalent(with: event) }
+        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        switch (chars, mods) {
+        case (String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!)), []):
+            seek(by: -5); return true
+        case (String(Character(UnicodeScalar(NSRightArrowFunctionKey)!)), []):
+            seek(by: 5); return true
+        case (String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!)), .shift):
+            seek(by: -30); return true
+        case (String(Character(UnicodeScalar(NSRightArrowFunctionKey)!)), .shift):
+            seek(by: 30); return true
+        case (String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!)), .command):
+            seek(by: -60); return true
+        case (String(Character(UnicodeScalar(NSRightArrowFunctionKey)!)), .command):
+            seek(by: 60); return true
+        case (String(Character(UnicodeScalar(NSUpArrowFunctionKey)!)), []):
+            adjustVolume(by: 0.05); return true
+        case (String(Character(UnicodeScalar(NSDownArrowFunctionKey)!)), []):
+            adjustVolume(by: -0.05); return true
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+    }
+
     override func keyDown(with event: NSEvent) {
         guard let characters = event.charactersIgnoringModifiers else {
             super.keyDown(with: event)

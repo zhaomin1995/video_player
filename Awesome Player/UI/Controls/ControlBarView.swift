@@ -28,7 +28,7 @@ class ControlBarView: NSView {
     private let volumeSlider = VolumeSliderView()
     private let speedButton = SpeedButton()
     private let fullscreenButton = NSButton()
-    private let airplayPlaceholder = NSView()
+    private let castButton = CastButton()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -97,6 +97,9 @@ class ControlBarView: NSView {
         fullscreenButton.translatesAutoresizingMaskIntoConstraints = false
         effectView.addSubview(fullscreenButton)
 
+        castButton.translatesAutoresizingMaskIntoConstraints = false
+        effectView.addSubview(castButton)
+
         setupConstraints()
     }
 
@@ -141,6 +144,11 @@ class ControlBarView: NSView {
 
             speedButton.leadingAnchor.constraint(equalTo: volumeSlider.trailingAnchor, constant: 10),
             speedButton.centerYAnchor.constraint(equalTo: playbackButtons.centerYAnchor),
+
+            castButton.trailingAnchor.constraint(equalTo: fullscreenButton.leadingAnchor, constant: -8),
+            castButton.centerYAnchor.constraint(equalTo: playbackButtons.centerYAnchor),
+            castButton.widthAnchor.constraint(equalToConstant: 28),
+            castButton.heightAnchor.constraint(equalToConstant: 28),
 
             fullscreenButton.trailingAnchor.constraint(equalTo: effectView.trailingAnchor, constant: -12),
             fullscreenButton.centerYAnchor.constraint(equalTo: playbackButtons.centerYAnchor),
