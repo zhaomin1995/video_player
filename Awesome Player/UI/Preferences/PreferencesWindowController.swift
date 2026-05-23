@@ -71,6 +71,13 @@ class PreferencesWindowController: NSWindowController {
             if name == sender.itemIdentifier.rawValue {
                 tabView.selectTabViewItem(at: i)
                 window?.title = name
+                // Trigger relayout for newly visible tab content
+                DispatchQueue.main.async {
+                    self.tabView.selectedTabViewItem?.view?.subviews.forEach { subview in
+                        subview.needsLayout = true
+                        NotificationCenter.default.post(name: NSView.frameDidChangeNotification, object: subview)
+                    }
+                }
                 break
             }
         }
@@ -482,9 +489,12 @@ extension NSView {
             container.frame = NSRect(x: 0, y: 0, width: w, height: stack.frame.maxY + 12)
         }
 
+        // Layout now and also whenever the view becomes visible (tab switch)
         DispatchQueue.main.async { layout() }
-        // Also relayout when the tab becomes visible
         NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main) { _ in layout() }
+        NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { _ in
+            DispatchQueue.main.async { layout() }
+        }
     }
 
     func addSectionHeader(_ stack: NSStackView, _ title: String) {

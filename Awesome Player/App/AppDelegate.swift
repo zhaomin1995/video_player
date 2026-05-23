@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Defaults.registerDefaults()
+        applyTheme()
         MenuManager.setupMainMenu()
 
         windowController = PlayerWindowController()
@@ -14,6 +15,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.window?.makeKeyAndOrderFront(nil)
 
         NSApp.activate(ignoringOtherApps: true)
+
+        // Watch for theme changes from preferences
+        UserDefaults.standard.addObserver(self, forKeyPath: Defaults.theme, options: .new, context: nil)
+    }
+
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if keyPath == Defaults.theme {
+            applyTheme()
+        }
+    }
+
+    private func applyTheme() {
+        let themeIndex = UserDefaults.standard.integer(forKey: Defaults.theme)
+        switch themeIndex {
+        case 1: NSApp.appearance = NSAppearance(named: .darkAqua)
+        case 2: NSApp.appearance = NSAppearance(named: .aqua)
+        default: NSApp.appearance = nil // system
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
