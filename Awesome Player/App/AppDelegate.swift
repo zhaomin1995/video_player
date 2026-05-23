@@ -159,7 +159,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .applicationVersion: "1.0",
             .version: "1",
             .credits: NSAttributedString(
-                string: "An awesome player developed by a cute boy\n\nxzm01234@gmail.com",
+                string: "An awesome video player developed by 乖乖小狗\n\nxzm01234@gmail.com",
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 11),
                     .foregroundColor: NSColor.secondaryLabelColor,
