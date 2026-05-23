@@ -34,7 +34,8 @@ class PlayerWindow: NSWindow {
     }
 
     func setAspectRatio(_ ratio: NSSize) {
-        contentAspectRatio = ratio
+        // Don't lock contentAspectRatio — let the user resize freely.
+        // AVPlayerLayer handles letterboxing with .resizeAspect.
     }
 
     func clearAspectRatio() {
