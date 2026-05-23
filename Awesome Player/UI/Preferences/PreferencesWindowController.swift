@@ -23,6 +23,7 @@ class PreferencesWindowController: NSWindowController {
             defer: false
         )
         window.title = "General"
+        window.titleVisibility = .visible
         window.center()
         super.init(window: window)
         setupTabs()
@@ -35,7 +36,9 @@ class PreferencesWindowController: NSWindowController {
         toolbar.delegate = self
         toolbar.displayMode = .iconAndLabel
         toolbar.allowsUserCustomization = false
+        toolbar.centeredItemIdentifiers = Set(tabs.map { NSToolbarItem.Identifier($0.0) })
         window?.toolbar = toolbar
+        window?.toolbarStyle = .preference
 
         tabView.translatesAutoresizingMaskIntoConstraints = false
         tabView.tabViewType = .noTabsNoBorder
@@ -91,16 +94,11 @@ extension PreferencesWindowController: NSToolbarDelegate {
         guard let tab = tabs.first(where: { $0.0 == itemIdentifier.rawValue }) else { return nil }
         let item = NSToolbarItem(itemIdentifier: itemIdentifier)
         item.label = tab.0
-        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-        if let img = NSImage(systemSymbolName: tab.1, accessibilityDescription: tab.0)?.withSymbolConfiguration(config) {
-            let tinted = NSImage(size: img.size, flipped: false) { rect in
-                tab.2.set()
-                img.draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1.0)
-                return true
-            }
-            tinted.isTemplate = false
-            item.image = tinted
-        }
+        let config = NSImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [tab.2]))
+        item.image = NSImage(systemSymbolName: tab.1, accessibilityDescription: tab.0)?
+            .withSymbolConfiguration(config)
+        item.image?.isTemplate = false
         item.target = self
         item.action = #selector(tabClicked(_:))
         return item
