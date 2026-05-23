@@ -1,7 +1,6 @@
 import Cocoa
 import AVFoundation
 
-@main
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowController: PlayerWindowController?
     private var preferencesController: PreferencesWindowController?
@@ -12,6 +11,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         windowController = PlayerWindowController()
         windowController?.showWindow(nil)
+        windowController?.window?.makeKeyAndOrderFront(nil)
+
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

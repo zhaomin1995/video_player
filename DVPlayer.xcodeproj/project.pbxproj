@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A10001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10001; };
+		A10060 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10060; };
 		A10002 /* AudioCompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10002; };
 		A10003 /* AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10003; };
 		A10004 /* AudioEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10004; };
@@ -57,6 +58,7 @@
 
 /* Begin PBXFileReference section */
 		F10001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		F10060 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		F10002 /* AudioCompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCompressor.swift; sourceTree = "<group>"; };
 		F10003 /* AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngine.swift; sourceTree = "<group>"; };
 		F10004 /* AudioEqualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEqualizer.swift; sourceTree = "<group>"; };
@@ -145,6 +147,7 @@
 		G00010 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				F10060 /* main.swift */,
 				F10001 /* AppDelegate.swift */,
 				F10034 /* Info.plist */,
 			);
@@ -420,6 +423,7 @@
 				A10046 /* CastPanelView.swift in Sources */,
 				A10047 /* PreferencesWindowController.swift in Sources */,
 				A10048 /* FFmpegBridge.m in Sources */,
+				A10060 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
