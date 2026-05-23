@@ -194,24 +194,35 @@ class PlayerViewController: NSViewController {
         }
     }
 
+    private var playbackStatusObservation: NSKeyValueObservation?
+
     private func playWithEngine(_ engine: AVPlayerEngine, url: URL) {
         print("[DVPlayer] Opening: \(url.path)")
         engine.open(url: url)
         videoView.setPlayer(engine.player)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self = self else { return }
-            self.controlBarView.setDuration(engine.duration)
-            engine.play()
-            self.controlBarView.setPlaying(true)
+        playbackStatusObservation = engine.player?.currentItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
+            guard item.status == .readyToPlay else {
+                if item.status == .failed {
+                    print("[DVPlayer] Player item FAILED: \(item.error?.localizedDescription ?? "?")")
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                print("[DVPlayer] Ready to play! Duration: \(engine.duration)s")
+                self.controlBarView.setDuration(engine.duration)
+                engine.play()
+                self.controlBarView.setPlaying(true)
 
-            if let window = self.view.window as? PlayerWindow, let videoSize = engine.videoSize {
-                window.setAspectRatio(videoSize)
-                let screenFrame = NSScreen.main?.visibleFrame ?? .zero
-                let scale = min(screenFrame.width * 0.7 / videoSize.width, screenFrame.height * 0.7 / videoSize.height, 1.0)
-                let newSize = NSSize(width: videoSize.width * scale, height: videoSize.height * scale)
-                window.setContentSize(newSize)
-                window.center()
+                if let window = self.view.window as? PlayerWindow, let videoSize = engine.videoSize {
+                    window.setAspectRatio(videoSize)
+                    let screenFrame = NSScreen.main?.visibleFrame ?? .zero
+                    let scale = min(screenFrame.width * 0.7 / videoSize.width, screenFrame.height * 0.7 / videoSize.height, 1.0)
+                    let newSize = NSSize(width: videoSize.width * scale, height: videoSize.height * scale)
+                    window.setContentSize(newSize)
+                    window.center()
+                }
             }
         }
     }

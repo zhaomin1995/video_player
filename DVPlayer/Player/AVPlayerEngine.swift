@@ -68,7 +68,11 @@ class AVPlayerEngine: NSObject {
 
         let avPlayer = AVPlayer(playerItem: item)
         avPlayer.allowsExternalPlayback = true
+        avPlayer.volume = 1.0
+        avPlayer.isMuted = false
         player = avPlayer
+
+        print("[AVPlayerEngine] Created player for: \(url.lastPathComponent), volume=\(avPlayer.volume), muted=\(avPlayer.isMuted)")
 
         setupTimeObserver()
         setupNotifications()
@@ -90,6 +94,7 @@ class AVPlayerEngine: NSObject {
 
     func play() {
         player?.play()
+        print("[AVPlayerEngine] play() called, rate=\(player?.rate ?? 0), volume=\(player?.volume ?? 0), status=\(playerItem?.status.rawValue ?? -1)")
         delegate?.playerEngineDidUpdateStatus(isPlaying: true)
     }
 
@@ -163,6 +168,7 @@ class AVPlayerEngine: NSObject {
 
     private func observeItemStatus() {
         itemStatusObservation = playerItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
+            print("[AVPlayerEngine] Item status changed: \(item.status.rawValue) error: \(item.error?.localizedDescription ?? "none")")
             guard let self = self, item.status == .readyToPlay else { return }
             let dur = item.duration.seconds
             if dur.isFinite && dur > 0 {
