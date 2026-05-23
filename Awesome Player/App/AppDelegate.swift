@@ -159,7 +159,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .applicationVersion: "1.0",
             .version: "1",
             .credits: NSAttributedString(
-                string: "A Dolby Vision + AirPlay video player\nfor macOS\n\nxzm01234@gmail.com",
+                string: "An awesome player developed by a cute boy\n\nxzm01234@gmail.com",
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 11),
                     .foregroundColor: NSColor.secondaryLabelColor,
@@ -170,7 +170,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }(),
                 ]
             ),
-            NSApplication.AboutPanelOptionKey(rawValue: "Copyright"): "Copyright © 2025 Awesome Player. All rights reserved.",
+            NSApplication.AboutPanelOptionKey(rawValue: "Copyright"): "Copyright © 2025 Awesome Player. No damn rights reserved.",
         ])
     }
 
