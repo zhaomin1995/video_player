@@ -4,6 +4,9 @@
 #include "libavcodec/avcodec.h"
 #include "libavutil/avutil.h"
 #include "libavutil/dict.h"
+#include "libavutil/channel_layout.h"
+#include "libavutil/opt.h"
+#include "libswresample/swresample.h"
 
 #define HAS_FFMPEG 1
 
@@ -157,6 +160,16 @@
     return tracks;
 }
 
+static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
+    return codec_id == AV_CODEC_ID_AAC ||
+           codec_id == AV_CODEC_ID_AC3 ||
+           codec_id == AV_CODEC_ID_EAC3 ||
+           codec_id == AV_CODEC_ID_MP3 ||
+           codec_id == AV_CODEC_ID_ALAC ||
+           codec_id == AV_CODEC_ID_FLAC ||
+           codec_id == AV_CODEC_ID_OPUS;
+}
+
 + (BOOL)remuxFile:(NSString *)inputPath
        toOutput:(NSString *)outputPath
           error:(NSError **)error {
@@ -181,7 +194,10 @@
     }
 
     int *stream_mapping = calloc(ifmt_ctx->nb_streams, sizeof(int));
+    int audio_transcode_stream = -1; // input stream index that needs transcoding
     int stream_index = 0;
+
+    AVCodecContext *dec_ctx = NULL, *enc_ctx = NULL;
 
     for (unsigned i = 0; i < ifmt_ctx->nb_streams; i++) {
         AVCodecParameters *codecpar = ifmt_ctx->streams[i]->codecpar;
@@ -192,16 +208,57 @@
         }
 
         stream_mapping[i] = stream_index++;
-
         AVStream *out_stream = avformat_new_stream(ofmt_ctx, NULL);
-        avcodec_parameters_copy(out_stream->codecpar, codecpar);
-        out_stream->codecpar->codec_tag = 0;
+
+        if (codecpar->codec_type == AVMEDIA_TYPE_AUDIO && !isAudioCodecMP4Compatible(codecpar->codec_id)) {
+            // Transcode to AAC
+            NSLog(@"[FFmpegBridge] Audio codec %d not MP4-compatible, transcoding to AAC", codecpar->codec_id);
+            audio_transcode_stream = i;
+
+            // Setup decoder
+            const AVCodec *decoder = avcodec_find_decoder(codecpar->codec_id);
+            if (!decoder) {
+                NSLog(@"[FFmpegBridge] No decoder for codec %d", codecpar->codec_id);
+                stream_mapping[i] = -1;
+                stream_index--;
+                continue;
+            }
+            dec_ctx = avcodec_alloc_context3(decoder);
+            avcodec_parameters_to_context(dec_ctx, codecpar);
+            avcodec_open2(dec_ctx, decoder, NULL);
+
+            // Setup AAC encoder
+            const AVCodec *encoder = avcodec_find_encoder(AV_CODEC_ID_AAC);
+            if (!encoder) {
+                NSLog(@"[FFmpegBridge] No AAC encoder found");
+                avcodec_free_context(&dec_ctx);
+                stream_mapping[i] = -1;
+                stream_index--;
+                continue;
+            }
+            enc_ctx = avcodec_alloc_context3(encoder);
+            enc_ctx->sample_rate = codecpar->sample_rate;
+            enc_ctx->bit_rate = 128000;
+            av_channel_layout_default(&enc_ctx->ch_layout, codecpar->ch_layout.nb_channels);
+            enc_ctx->sample_fmt = encoder->sample_fmts ? encoder->sample_fmts[0] : AV_SAMPLE_FMT_FLTP;
+            enc_ctx->time_base = (AVRational){1, codecpar->sample_rate};
+            if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
+                enc_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+            avcodec_open2(enc_ctx, encoder, NULL);
+            avcodec_parameters_from_context(out_stream->codecpar, enc_ctx);
+            out_stream->time_base = enc_ctx->time_base;
+        } else {
+            avcodec_parameters_copy(out_stream->codecpar, codecpar);
+            out_stream->codecpar->codec_tag = 0;
+        }
     }
 
     if (!(ofmt_ctx->oformat->flags & AVFMT_NOFILE)) {
         ret = avio_open(&ofmt_ctx->pb, [outputPath UTF8String], AVIO_FLAG_WRITE);
         if (ret < 0) {
             free(stream_mapping);
+            if (dec_ctx) avcodec_free_context(&dec_ctx);
+            if (enc_ctx) avcodec_free_context(&enc_ctx);
             avformat_close_input(&ifmt_ctx);
             avformat_free_context(ofmt_ctx);
             return NO;
@@ -210,18 +267,32 @@
 
     AVDictionary *opts = NULL;
     av_dict_set(&opts, "movflags", "faststart", 0);
-
     ret = avformat_write_header(ofmt_ctx, &opts);
     av_dict_free(&opts);
     if (ret < 0) {
         free(stream_mapping);
+        if (dec_ctx) avcodec_free_context(&dec_ctx);
+        if (enc_ctx) avcodec_free_context(&enc_ctx);
         avformat_close_input(&ifmt_ctx);
         avio_closep(&ofmt_ctx->pb);
         avformat_free_context(ofmt_ctx);
         return NO;
     }
 
+    // Setup resampler for audio transcoding if needed
+    struct SwrContext *swr_ctx = NULL;
+    if (dec_ctx && enc_ctx) {
+        swr_alloc_set_opts2(&swr_ctx,
+                            &enc_ctx->ch_layout, enc_ctx->sample_fmt, enc_ctx->sample_rate,
+                            &dec_ctx->ch_layout, dec_ctx->sample_fmt, dec_ctx->sample_rate,
+                            0, NULL);
+        swr_init(swr_ctx);
+    }
+
     AVPacket *pkt = av_packet_alloc();
+    AVFrame *frame = av_frame_alloc();
+    AVPacket *enc_pkt = av_packet_alloc();
+
     while (av_read_frame(ifmt_ctx, pkt) >= 0) {
         if (pkt->stream_index >= (int)ifmt_ctx->nb_streams ||
             stream_mapping[pkt->stream_index] < 0) {
@@ -229,24 +300,76 @@
             continue;
         }
 
-        AVStream *in_stream = ifmt_ctx->streams[pkt->stream_index];
-        pkt->stream_index = stream_mapping[pkt->stream_index];
+        int in_idx = pkt->stream_index;
+        AVStream *in_stream = ifmt_ctx->streams[in_idx];
+        pkt->stream_index = stream_mapping[in_idx];
         AVStream *out_stream = ofmt_ctx->streams[pkt->stream_index];
 
-        pkt->pts = av_rescale_q_rnd(pkt->pts, in_stream->time_base, out_stream->time_base,
-                                     AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
-        pkt->dts = av_rescale_q_rnd(pkt->dts, in_stream->time_base, out_stream->time_base,
-                                     AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
-        pkt->duration = av_rescale_q(pkt->duration, in_stream->time_base, out_stream->time_base);
-        pkt->pos = -1;
+        if (in_idx == audio_transcode_stream && dec_ctx && enc_ctx) {
+            // Decode -> resample -> encode
+            ret = avcodec_send_packet(dec_ctx, pkt);
+            av_packet_unref(pkt);
+            while (ret >= 0) {
+                ret = avcodec_receive_frame(dec_ctx, frame);
+                if (ret < 0) break;
 
-        av_interleaved_write_frame(ofmt_ctx, pkt);
-        av_packet_unref(pkt);
+                // Resample
+                AVFrame *resampled = av_frame_alloc();
+                resampled->sample_rate = enc_ctx->sample_rate;
+                resampled->format = enc_ctx->sample_fmt;
+                av_channel_layout_copy(&resampled->ch_layout, &enc_ctx->ch_layout);
+                resampled->nb_samples = swr_get_out_samples(swr_ctx, frame->nb_samples);
+                av_frame_get_buffer(resampled, 0);
+                swr_convert(swr_ctx, resampled->data, resampled->nb_samples,
+                           (const uint8_t **)frame->data, frame->nb_samples);
+                resampled->pts = frame->pts;
+
+                avcodec_send_frame(enc_ctx, resampled);
+                av_frame_free(&resampled);
+
+                while (avcodec_receive_packet(enc_ctx, enc_pkt) >= 0) {
+                    enc_pkt->stream_index = pkt->stream_index;
+                    av_packet_rescale_ts(enc_pkt, enc_ctx->time_base, out_stream->time_base);
+                    enc_pkt->stream_index = stream_mapping[in_idx];
+                    av_interleaved_write_frame(ofmt_ctx, enc_pkt);
+                    av_packet_unref(enc_pkt);
+                }
+                av_frame_unref(frame);
+            }
+        } else {
+            // Copy packet (video or compatible audio)
+            pkt->pts = av_rescale_q_rnd(pkt->pts, in_stream->time_base, out_stream->time_base,
+                                         AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+            pkt->dts = av_rescale_q_rnd(pkt->dts, in_stream->time_base, out_stream->time_base,
+                                         AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+            pkt->duration = av_rescale_q(pkt->duration, in_stream->time_base, out_stream->time_base);
+            pkt->pos = -1;
+            av_interleaved_write_frame(ofmt_ctx, pkt);
+            av_packet_unref(pkt);
+        }
+    }
+
+    // Flush encoder
+    if (enc_ctx) {
+        avcodec_send_frame(enc_ctx, NULL);
+        while (avcodec_receive_packet(enc_ctx, enc_pkt) >= 0) {
+            enc_pkt->stream_index = stream_mapping[audio_transcode_stream];
+            AVStream *out_stream = ofmt_ctx->streams[enc_pkt->stream_index];
+            av_packet_rescale_ts(enc_pkt, enc_ctx->time_base, out_stream->time_base);
+            av_interleaved_write_frame(ofmt_ctx, enc_pkt);
+            av_packet_unref(enc_pkt);
+        }
     }
 
     av_packet_free(&pkt);
+    av_packet_free(&enc_pkt);
+    av_frame_free(&frame);
     av_write_trailer(ofmt_ctx);
     free(stream_mapping);
+
+    if (swr_ctx) swr_free(&swr_ctx);
+    if (dec_ctx) avcodec_free_context(&dec_ctx);
+    if (enc_ctx) avcodec_free_context(&enc_ctx);
 
     if (!(ofmt_ctx->oformat->flags & AVFMT_NOFILE))
         avio_closep(&ofmt_ctx->pb);
