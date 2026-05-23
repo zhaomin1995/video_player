@@ -44,6 +44,15 @@
 		A10035 /* CastingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10036; };
 		A10036 /* ChromecastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10037; };
 		A10037 /* DLNAManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10038; };
+		A10040 /* PanelContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10040; };
+		A10041 /* PlaylistPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10041; };
+		A10042 /* AudioPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10042; };
+		A10043 /* SubtitlePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10043; };
+		A10044 /* VideoPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10044; };
+		A10045 /* MediaInfoPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10045; };
+		A10046 /* CastPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10046; };
+		A10047 /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10047; };
+		A10048 /* FFmpegBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = F10048; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -85,6 +94,17 @@
 		F10036 /* CastingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingManager.swift; sourceTree = "<group>"; };
 		F10037 /* ChromecastManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromecastManager.swift; sourceTree = "<group>"; };
 		F10038 /* DLNAManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DLNAManager.swift; sourceTree = "<group>"; };
+		F10040 /* PanelContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelContainerView.swift; sourceTree = "<group>"; };
+		F10041 /* PlaylistPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistPanelView.swift; sourceTree = "<group>"; };
+		F10042 /* AudioPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPanelView.swift; sourceTree = "<group>"; };
+		F10043 /* SubtitlePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitlePanelView.swift; sourceTree = "<group>"; };
+		F10044 /* VideoPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPanelView.swift; sourceTree = "<group>"; };
+		F10045 /* MediaInfoPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaInfoPanelView.swift; sourceTree = "<group>"; };
+		F10046 /* CastPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastPanelView.swift; sourceTree = "<group>"; };
+		F10047 /* PreferencesWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
+		F10048 /* FFmpegBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FFmpegBridge.m; sourceTree = "<group>"; };
+		F10049 /* FFmpegBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FFmpegBridge.h; sourceTree = "<group>"; };
+		F10050 /* DVPlayer-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "DVPlayer-Bridging-Header.h"; sourceTree = "<group>"; };
 		F10099 /* DVPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DVPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -229,6 +249,13 @@
 		G00064 /* Panels */ = {
 			isa = PBXGroup;
 			children = (
+				F10040 /* PanelContainerView.swift */,
+				F10041 /* PlaylistPanelView.swift */,
+				F10042 /* AudioPanelView.swift */,
+				F10043 /* SubtitlePanelView.swift */,
+				F10044 /* VideoPanelView.swift */,
+				F10045 /* MediaInfoPanelView.swift */,
+				F10046 /* CastPanelView.swift */,
 			);
 			path = Panels;
 			sourceTree = "<group>";
@@ -252,6 +279,7 @@
 		G00067 /* Preferences */ = {
 			isa = PBXGroup;
 			children = (
+				F10047 /* PreferencesWindowController.swift */,
 			);
 			path = Preferences;
 			sourceTree = "<group>";
@@ -259,6 +287,9 @@
 		G00070 /* FFmpeg */ = {
 			isa = PBXGroup;
 			children = (
+				F10048 /* FFmpegBridge.m */,
+				F10049 /* FFmpegBridge.h */,
+				F10050 /* DVPlayer-Bridging-Header.h */,
 			);
 			path = FFmpeg;
 			sourceTree = "<group>";
@@ -380,6 +411,15 @@
 				A10035 /* CastingManager.swift in Sources */,
 				A10036 /* ChromecastManager.swift in Sources */,
 				A10037 /* DLNAManager.swift in Sources */,
+				A10040 /* PanelContainerView.swift in Sources */,
+				A10041 /* PlaylistPanelView.swift in Sources */,
+				A10042 /* AudioPanelView.swift in Sources */,
+				A10043 /* SubtitlePanelView.swift in Sources */,
+				A10044 /* VideoPanelView.swift in Sources */,
+				A10045 /* MediaInfoPanelView.swift in Sources */,
+				A10046 /* CastPanelView.swift in Sources */,
+				A10047 /* PreferencesWindowController.swift in Sources */,
+				A10048 /* FFmpegBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -450,6 +490,16 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.dvplayer.DVPlayer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "DVPlayer/FFmpeg/DVPlayer-Bridging-Header.h";
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/ffmpeg/include";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/ffmpeg/lib";
+				OTHER_LDFLAGS = (
+					"-lavformat",
+					"-lavcodec",
+					"-lavutil",
+					"-lswresample",
+					"-lswscale",
+				);
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -471,6 +521,16 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.dvplayer.DVPlayer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "DVPlayer/FFmpeg/DVPlayer-Bridging-Header.h";
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/ffmpeg/include";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/ffmpeg/lib";
+				OTHER_LDFLAGS = (
+					"-lavformat",
+					"-lavcodec",
+					"-lavutil",
+					"-lswresample",
+					"-lswscale",
+				);
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

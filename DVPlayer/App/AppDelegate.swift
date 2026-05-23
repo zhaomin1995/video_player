@@ -4,6 +4,7 @@ import AVFoundation
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowController: PlayerWindowController?
+    private var preferencesController: PreferencesWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Defaults.registerDefaults()
@@ -115,5 +116,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Preferences
 
-    @objc func showPreferences(_ sender: Any?) {}
+    @objc func showPreferences(_ sender: Any?) {
+        if preferencesController == nil {
+            preferencesController = PreferencesWindowController()
+        }
+        preferencesController?.showWindow(nil)
+        preferencesController?.window?.makeKeyAndOrderFront(nil)
+    }
 }
