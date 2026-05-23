@@ -13,6 +13,7 @@ protocol ControlBarDelegate: AnyObject {
 class ControlBarView: NSView {
     weak var delegate: ControlBarDelegate?
 
+    private let gradientView = GradientScrimView()
     private let effectView = NSVisualEffectView()
     private let seekSlider = SeekSliderView()
     private let playbackButtons = PlaybackButtons()
@@ -36,12 +37,18 @@ class ControlBarView: NSView {
     private func setupViews() {
         wantsLayer = true
 
-        effectView.material = .hudWindow
+        // Dark gradient scrim behind controls for readability
+        gradientView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(gradientView)
+
+        // Dark solid background with slight transparency
+        effectView.material = .dark
         effectView.blendingMode = .behindWindow
         effectView.state = .active
         effectView.wantsLayer = true
         effectView.layer?.cornerRadius = 10
         effectView.layer?.masksToBounds = true
+        effectView.layer?.backgroundColor = NSColor(white: 0.08, alpha: 0.92).cgColor
         effectView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(effectView)
 
@@ -92,13 +99,19 @@ class ControlBarView: NSView {
     }
 
     private func configureTimeLabel(_ label: NSTextField) {
-        label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        label.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         label.textColor = .white
         label.translatesAutoresizingMaskIntoConstraints = false
     }
 
     private func setupConstraints() {
         NSLayoutConstraint.activate([
+            // Gradient scrim extends above the control bar for smooth fade
+            gradientView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            gradientView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            gradientView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            gradientView.heightAnchor.constraint(equalToConstant: 140),
+
             effectView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             effectView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             effectView.topAnchor.constraint(equalTo: topAnchor),

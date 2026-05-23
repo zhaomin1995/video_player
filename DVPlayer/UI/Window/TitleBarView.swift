@@ -29,6 +29,7 @@ class TitleBarView: NSView {
 
     private func setupViews() {
         wantsLayer = true
+        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.5).cgColor
 
         titleLabel.font = .systemFont(ofSize: 13, weight: .medium)
         titleLabel.textColor = .white

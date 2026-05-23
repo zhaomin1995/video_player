@@ -167,11 +167,39 @@ class PlayerViewController: NSViewController {
         playerEngine = engine
         engine.delegate = self
 
+        if url.isNativeAVPlayerFormat {
+            playWithEngine(engine, url: url)
+        } else {
+            osdView.show(message: "Remuxing \(url.pathExtension.uppercased())…", duration: 3.0)
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("mp4")
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                var success = false
+                do {
+                    try FFmpegBridge.remuxFile(url.path, toOutput: tempURL.path)
+                    success = true
+                } catch {
+                    print("Remux failed: \(error)")
+                }
+                DispatchQueue.main.async {
+                    if success {
+                        self?.playWithEngine(engine, url: tempURL)
+                        self?.osdView.show(message: "Playing")
+                    } else {
+                        self?.playWithEngine(engine, url: url)
+                    }
+                }
+            }
+        }
+    }
+
+    private func playWithEngine(_ engine: AVPlayerEngine, url: URL) {
         engine.open(url: url)
         videoView.setPlayer(engine.player)
         controlBarView.setDuration(engine.duration)
-
         engine.play()
+        controlBarView.setPlaying(true)
 
         if let window = view.window as? PlayerWindow, let videoSize = engine.videoSize {
             window.setAspectRatio(videoSize)

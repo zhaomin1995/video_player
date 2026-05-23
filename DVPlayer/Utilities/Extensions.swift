@@ -46,3 +46,35 @@ extension URL {
 extension NSColor {
     static let dvPlayerAccent = NSColor.controlAccentColor
 }
+
+class GradientScrimView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+    }
+
+    override func updateLayer() {
+        let gradient = CAGradientLayer()
+        gradient.frame = bounds
+        gradient.colors = [
+            NSColor.clear.cgColor,
+            NSColor.black.withAlphaComponent(0.6).cgColor,
+            NSColor.black.withAlphaComponent(0.85).cgColor,
+        ]
+        gradient.locations = [0.0, 0.5, 1.0]
+        gradient.startPoint = CGPoint(x: 0.5, y: 0)
+        gradient.endPoint = CGPoint(x: 0.5, y: 1)
+        layer?.sublayers?.removeAll()
+        layer?.addSublayer(gradient)
+    }
+
+    override func layout() {
+        super.layout()
+        layer?.sublayers?.first?.frame = bounds
+    }
+}
