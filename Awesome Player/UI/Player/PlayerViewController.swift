@@ -190,36 +190,9 @@ class PlayerViewController: NSViewController {
         playerEngine = engine
         engine.delegate = self
 
-        if url.isNativeAVPlayerFormat {
-            playWithEngine(engine, url: url)
-        } else {
-            // Non-native container (MKV, AVI, etc.) — remux to temp MP4 on a background
-            // thread so the UI stays responsive. FFmpegBridge copies video as-is and
-            // transcodes incompatible audio (e.g. Vorbis) to AAC.
-            osdView.show(message: "Remuxing \(url.pathExtension.uppercased())…", duration: 3.0)
-            let tempURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString)
-                .appendingPathExtension("mp4")
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                var success = false
-                do {
-                    try FFmpegBridge.remuxFile(url.path, toOutput: tempURL.path)
-                    success = true
-                } catch {
-                    print("Remux failed: \(error)")
-                }
-                DispatchQueue.main.async {
-                    if success {
-                        self?.playWithEngine(engine, url: tempURL)
-                        self?.osdView.show(message: "Playing")
-                    } else {
-                        // Fallback: try playing the original file directly — AVPlayer
-                        // may partially support it (e.g. audio-only)
-                        self?.playWithEngine(engine, url: url)
-                    }
-                }
-            }
-        }
+        // Try AVPlayer directly first for instant playback.
+        // Only remux if AVPlayer fails (detected via .failed status).
+        playWithEngine(engine, url: url, fallbackRemux: !url.isNativeAVPlayerFormat)
     }
 
     private var playbackStatusObservation: NSKeyValueObservation?
@@ -228,7 +201,7 @@ class PlayerViewController: NSViewController {
     /// We observe the item status here (in addition to AVPlayerEngine's own observation)
     /// because the VC needs to resize the window to match the video's native aspect ratio
     /// — that info is only available after the asset header is parsed.
-    private func playWithEngine(_ engine: AVPlayerEngine, url: URL) {
+    private func playWithEngine(_ engine: AVPlayerEngine, url: URL, fallbackRemux: Bool = false) {
         print("[AwesomePlayer] Opening: \(url.path)")
         engine.open(url: url)
         videoView.setPlayer(engine.player)
@@ -237,6 +210,10 @@ class PlayerViewController: NSViewController {
             guard item.status == .readyToPlay else {
                 if item.status == .failed {
                     print("[AwesomePlayer] Player item FAILED: \(item.error?.localizedDescription ?? "?")")
+                    if fallbackRemux {
+                        self?.remuxAndPlay(engine: engine, url: url)
+                        return
+                    }
                 }
                 return
             }
@@ -255,6 +232,37 @@ class PlayerViewController: NSViewController {
                     let newSize = NSSize(width: videoSize.width * scale, height: videoSize.height * scale)
                     window.setContentSize(newSize)
                     window.center()
+                }
+            }
+        }
+    }
+
+
+    private func remuxAndPlay(engine: AVPlayerEngine, url: URL) {
+        DispatchQueue.main.async {
+            self.osdView.show(message: "Remuxing \(url.pathExtension.uppercased())…", duration: 10.0)
+        }
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("mp4")
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var success = false
+            do {
+                try FFmpegBridge.remuxFile(url.path, toOutput: tempURL.path)
+                success = true
+            } catch {
+                print("[AwesomePlayer] Remux failed: \(error)")
+            }
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if success {
+                    let newEngine = AVPlayerEngine()
+                    self.playerEngine = newEngine
+                    newEngine.delegate = self
+                    self.playWithEngine(newEngine, url: tempURL)
+                    self.osdView.show(message: "Playing")
+                } else {
+                    self.osdView.show(message: "Failed to open file")
                 }
             }
         }
