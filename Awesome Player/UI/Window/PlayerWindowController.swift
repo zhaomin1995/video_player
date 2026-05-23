@@ -59,8 +59,12 @@ class PlayerWindowController: NSWindowController {
     }
 
     func toggleFullscreen() {
+        // Restore cursor before toggling in case we're exiting fullscreen
+        if cursorHidden {
+            NSCursor.unhide()
+            cursorHidden = false
+        }
         window?.toggleFullScreen(nil)
-        // Start idle timer immediately so controls auto-hide in fullscreen
         resetIdleTimer()
     }
 
