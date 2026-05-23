@@ -51,11 +51,12 @@ class WelcomeView: NSView {
         gradient.type = .radial
         gradient.frame = bounds
         gradient.colors = [
+            NSColor(white: 0.06, alpha: 1).cgColor,
             NSColor(white: 0.10, alpha: 1).cgColor,
-            NSColor(white: 0.15, alpha: 1).cgColor,
+            NSColor(white: 0.16, alpha: 1).cgColor,
             NSColor(white: 0.22, alpha: 1).cgColor,
         ]
-        gradient.locations = [0.0, 0.5, 1.0]
+        gradient.locations = [0.0, 0.3, 0.7, 1.0]
         gradient.startPoint = CGPoint(x: 0.5, y: 0.5)
         gradient.endPoint = CGPoint(x: 1.0, y: 1.0)
 
