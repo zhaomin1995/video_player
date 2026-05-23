@@ -460,11 +460,24 @@ extension NSView {
     }
 
     func embed(_ stack: NSStackView) {
+        // Wrap in a flipped container so content starts from the top
+        let container = FlippedView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: container.bottomAnchor, constant: -12),
+        ])
+
         let scrollView = NSScrollView()
-        scrollView.documentView = stack
+        scrollView.documentView = container
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.drawsBackground = false
+        scrollView.automaticallyAdjustsContentInsets = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
 
@@ -473,9 +486,7 @@ extension NSView {
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stack.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor, constant: 12),
-            stack.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            container.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
         ])
     }
 
@@ -525,6 +536,10 @@ extension NSView {
         slider.widthAnchor.constraint(equalToConstant: 200).isActive = true
         addRow(stack, label, slider)
     }
+}
+
+class FlippedView: NSView {
+    override var isFlipped: Bool { true }
 }
 
 extension NSPopUpButton {
