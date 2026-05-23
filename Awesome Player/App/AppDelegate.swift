@@ -80,6 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func showAudioPanel(_ sender: Any?) {}
     @objc func togglePassthrough(_ sender: Any?) {}
     @objc func setEQPreset(_ sender: Any?) {}
+    @objc func selectOutputDevice(_ sender: Any?) {}
     @objc func audioSyncPull(_ sender: Any?) {}
     @objc func audioSyncPush(_ sender: Any?) {}
     @objc func audioSyncRevert(_ sender: Any?) {}

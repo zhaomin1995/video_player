@@ -1,4 +1,71 @@
 import Cocoa
+import CoreAudio
+
+class AudioDeviceMenuDelegate: NSObject, NSMenuDelegate {
+    static let shared = AudioDeviceMenuDelegate()
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+
+        var propertySize: UInt32 = 0
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &propertySize) == noErr else { return }
+
+        let count = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: count)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &propertySize, &deviceIDs) == noErr else { return }
+
+        // Get default output device
+        var defaultDevice: AudioDeviceID = 0
+        var defaultSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var defaultAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &defaultAddress, 0, nil, &defaultSize, &defaultDevice)
+
+        for deviceID in deviceIDs {
+            // Check if device has output channels
+            var streamSize: UInt32 = 0
+            var streamAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyStreams,
+                mScope: kAudioObjectPropertyScopeOutput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            guard AudioObjectGetPropertyDataSize(deviceID, &streamAddress, 0, nil, &streamSize) == noErr, streamSize > 0 else { continue }
+
+            // Get device name
+            var nameSize = UInt32(MemoryLayout<CFString>.size)
+            var nameAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyDeviceNameCFString,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            var nameRef: CFString = "" as CFString
+            guard AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &nameRef) == noErr else { continue }
+
+            let item = NSMenuItem(title: nameRef as String, action: #selector(AppDelegate.selectOutputDevice(_:)), keyEquivalent: "")
+            item.tag = Int(deviceID)
+            item.target = nil
+            if deviceID == defaultDevice {
+                item.state = .on
+            }
+            menu.addItem(item)
+        }
+
+        if menu.items.isEmpty {
+            let none = NSMenuItem(title: "No devices found", action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            menu.addItem(none)
+        }
+    }
+}
 
 class MenuManager {
     static func setupMainMenu() {
@@ -120,7 +187,9 @@ class MenuManager {
 
         // Output Device submenu
         let deviceItem = NSMenuItem(title: "Output Device", action: nil, keyEquivalent: "")
-        deviceItem.submenu = NSMenu(title: "Output Device")
+        let deviceMenu = NSMenu(title: "Output Device")
+        deviceMenu.delegate = AudioDeviceMenuDelegate.shared
+        deviceItem.submenu = deviceMenu
         menu.addItem(deviceItem)
         menu.addItem(.separator())
 
