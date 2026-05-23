@@ -8,8 +8,8 @@ class PlayerWindow: NSWindow {
     override var canBecomeMain: Bool { true }
 
     init() {
-        let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1280, height: 720)
-        let windowSize = NSSize(width: 960, height: 540)
+        let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        let windowSize = NSSize(width: screenFrame.width * 0.7, height: screenFrame.height * 0.7)
         let origin = NSPoint(
             x: (screenFrame.width - windowSize.width) / 2,
             y: (screenFrame.height - windowSize.height) / 2
