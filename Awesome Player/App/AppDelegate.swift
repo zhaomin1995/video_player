@@ -131,6 +131,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         (windowController?.window as? PlayerWindow)?.toggleAlwaysOnTop()
     }
 
+    // MARK: - About
+
+    @objc func showAbout(_ sender: Any?) {
+        let iconConfig = NSImage.SymbolConfiguration(pointSize: 64, weight: .regular)
+        let catImage = NSImage(systemSymbolName: "cat.fill", accessibilityDescription: "Awesome Player")?.withSymbolConfiguration(iconConfig)
+
+        let icon: NSImage
+        if let cat = catImage {
+            let rendered = NSImage(size: NSSize(width: 128, height: 128))
+            rendered.lockFocus()
+            NSColor(calibratedRed: 0.55, green: 0.65, blue: 0.95, alpha: 1).setFill()
+            let rect = NSRect(x: 0, y: 0, width: 128, height: 128)
+            let bg = NSBezierPath(roundedRect: rect, xRadius: 28, yRadius: 28)
+            bg.fill()
+            cat.draw(in: NSRect(x: 20, y: 20, width: 88, height: 88),
+                     from: .zero, operation: .sourceOver, fraction: 1.0)
+            rendered.unlockFocus()
+            icon = rendered
+        } else {
+            icon = NSApp.applicationIconImage
+        }
+
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationIcon: icon,
+            .applicationName: "Awesome Player",
+            .applicationVersion: "1.0",
+            .version: "1",
+            .credits: NSAttributedString(
+                string: "A Dolby Vision + AirPlay video player\nfor macOS\n\nxzm01234@gmail.com",
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 11),
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .paragraphStyle: {
+                        let style = NSMutableParagraphStyle()
+                        style.alignment = .center
+                        return style
+                    }(),
+                ]
+            ),
+            NSApplication.AboutPanelOptionKey(rawValue: "Copyright"): "Copyright © 2025 Awesome Player. All rights reserved.",
+        ])
+    }
+
     // MARK: - Preferences
 
     @objc func showPreferences(_ sender: Any?) {

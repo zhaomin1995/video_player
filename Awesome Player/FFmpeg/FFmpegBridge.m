@@ -1,3 +1,14 @@
+/**
+ * FFmpegBridge — Obj-C wrapper around FFmpeg's C APIs for Swift consumption.
+ *
+ * Primary purpose: remux non-native containers (MKV, AVI) into MP4 so AVPlayer
+ * can handle playback. Video streams are copied without re-encoding. Audio streams
+ * are either copied (if MP4-compatible: AAC, AC3, etc.) or transcoded to AAC via
+ * libswresample + AVAudioFifo.
+ *
+ * The audio FIFO is necessary because decoders output variable-size frames but
+ * the AAC encoder requires exactly 1024 samples per frame.
+ */
 #import "FFmpegBridge.h"
 
 #include "libavformat/avformat.h"
@@ -40,14 +51,14 @@
             result.width = codecpar->width;
             result.height = codecpar->height;
 
-            // Check for Dolby Vision side data
+            // Dolby Vision uses a dedicated side data entry, not a codec flag
             for (int j = 0; j < stream->nb_side_data; j++) {
                 if (stream->side_data[j].type == AV_PKT_DATA_DOVI_CONF) {
                     result.hasDolbyVision = YES;
                 }
             }
 
-            // Check for HDR
+            // PQ (SMPTE 2084) = HDR10/DV, HLG (ARIB STD-B67) = broadcast HDR
             if (codecpar->color_trc == AVCOL_TRC_SMPTE2084 ||
                 codecpar->color_trc == AVCOL_TRC_ARIB_STD_B67) {
                 result.hasHDR = YES;
@@ -161,6 +172,8 @@
     return tracks;
 }
 
+/// Codecs that the MP4 (ISO BMFF) container can hold without transcoding.
+/// Anything not on this list (e.g. Vorbis, DTS, PCM) gets transcoded to AAC.
 static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
     return codec_id == AV_CODEC_ID_AAC ||
            codec_id == AV_CODEC_ID_AC3 ||
@@ -194,6 +207,7 @@ static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
         return NO;
     }
 
+    // Maps input stream index -> output stream index (-1 = skip, e.g. subtitle streams)
     int *stream_mapping = calloc(ifmt_ctx->nb_streams, sizeof(int));
     int audio_transcode_stream = -1; // input stream index that needs transcoding
     int stream_index = 0;
@@ -249,7 +263,9 @@ static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
             avcodec_parameters_from_context(out_stream->codecpar, enc_ctx);
             out_stream->time_base = enc_ctx->time_base;
         } else {
+            // Copy codec params as-is (video passthrough, or MP4-compatible audio)
             avcodec_parameters_copy(out_stream->codecpar, codecpar);
+            // Reset codec_tag — MP4 uses different tags than MKV/AVI
             out_stream->codecpar->codec_tag = 0;
         }
     }
@@ -266,6 +282,8 @@ static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
         }
     }
 
+    // "faststart" moves the moov atom to the front of the file so AVPlayer
+    // can begin playback before the full file is written (progressive download).
     AVDictionary *opts = NULL;
     av_dict_set(&opts, "movflags", "faststart", 0);
     ret = avformat_write_header(ofmt_ctx, &opts);
@@ -280,7 +298,9 @@ static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
         return NO;
     }
 
-    // Setup resampler and audio FIFO for transcoding
+    // Resampler converts between decoder's sample format/rate and AAC encoder's.
+    // Audio FIFO buffers decoded samples so we can feed the encoder exact 1024-sample
+    // frames — decoders like Vorbis output variable-size frames (e.g. 64-8192 samples).
     struct SwrContext *swr_ctx = NULL;
     AVAudioFifo *audio_fifo = NULL;
     __block int64_t audio_pts = 0;
@@ -299,7 +319,8 @@ static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
     AVFrame *frame = av_frame_alloc();
     AVPacket *enc_pkt = av_packet_alloc();
 
-    // Helper: encode frames from FIFO in exact frame_size chunks
+    // Drains the FIFO into the encoder in frame_size chunks. On flush (EOF),
+    // also encodes any remaining partial frame to avoid truncating audio.
     void (^drainFifo)(BOOL) = ^(BOOL flush) {
         int fs = enc_ctx->frame_size;
         while (av_audio_fifo_size(audio_fifo) >= fs || (flush && av_audio_fifo_size(audio_fifo) > 0)) {
@@ -383,7 +404,8 @@ static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
         }
     }
 
-    // Flush remaining samples from FIFO and encoder
+    // Flush: drain any buffered FIFO samples, then send NULL frame to flush
+    // the encoder's internal delay line (AAC has ~1 frame of latency).
     if (enc_ctx && audio_fifo) {
         drainFifo(YES);
         avcodec_send_frame(enc_ctx, NULL);

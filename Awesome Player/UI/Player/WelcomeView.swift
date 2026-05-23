@@ -1,3 +1,6 @@
+/// Welcome/empty-state view shown before a file is opened. Uses a radial gradient
+/// (dark center, lighter edges) to draw the eye inward toward the play icon, styled
+/// after Movist Pro's idle screen aesthetic.
 import Cocoa
 
 class WelcomeView: NSView {
@@ -31,6 +34,7 @@ class WelcomeView: NSView {
         let config = NSImage.SymbolConfiguration(pointSize: 48, weight: .medium)
         let image = NSImage(systemSymbolName: "play.fill", accessibilityDescription: "Play")?.withSymbolConfiguration(config)
         playSymbol.image = image
+        // Soft blue tint to contrast against the dark background without being garish
         playSymbol.contentTintColor = NSColor(calibratedRed: 0.55, green: 0.65, blue: 0.95, alpha: 1)
         playSymbol.translatesAutoresizingMaskIntoConstraints = false
         iconView.addSubview(playSymbol)
@@ -46,6 +50,9 @@ class WelcomeView: NSView {
         ])
     }
 
+    /// Rebuild the radial gradient whenever the layer needs updating (theme change, etc.).
+    /// Gradient radiates from dark center outward to subtly lighter edges, creating
+    /// depth without any visible "background image" — purely procedural.
     override func updateLayer() {
         let gradient = CAGradientLayer()
         gradient.type = .radial
@@ -57,9 +64,11 @@ class WelcomeView: NSView {
             NSColor(white: 0.22, alpha: 1).cgColor,
         ]
         gradient.locations = [0.0, 0.3, 0.7, 1.0]
+        // startPoint at center, endPoint at corner makes it a true radial (not linear)
         gradient.startPoint = CGPoint(x: 0.5, y: 0.5)
         gradient.endPoint = CGPoint(x: 1.0, y: 1.0)
 
+        // Remove stale gradient layers before inserting a fresh one
         layer?.sublayers?.filter { $0 is CAGradientLayer }.forEach { $0.removeFromSuperlayer() }
         layer?.insertSublayer(gradient, at: 0)
     }

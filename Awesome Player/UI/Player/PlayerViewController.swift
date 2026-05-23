@@ -1,3 +1,9 @@
+/// Main playback view controller. Handles two code paths for opening files:
+/// - Native formats (MP4/MOV with H.264/HEVC) go directly to AVPlayer
+/// - Non-native formats (MKV, AVI, etc.) are remuxed to a temp MP4 via FFmpeg first
+///
+/// The remux path keeps all playback through AVPlayer, which preserves Dolby Vision
+/// and AirPlay support. A direct FFmpeg software decoder engine is planned but not yet wired up.
 import Cocoa
 import AVFoundation
 
@@ -119,6 +125,8 @@ class PlayerViewController: NSViewController {
         onMouseMoved?()
     }
 
+    /// Scroll-wheel adjusts volume in fixed steps (not proportional to delta)
+    /// to avoid accidental large jumps from trackpad momentum scrolling.
     override func scrollWheel(with event: NSEvent) {
         let delta = event.scrollingDeltaY
         if abs(delta) > 0.5 {
@@ -185,6 +193,9 @@ class PlayerViewController: NSViewController {
         if url.isNativeAVPlayerFormat {
             playWithEngine(engine, url: url)
         } else {
+            // Non-native container (MKV, AVI, etc.) — remux to temp MP4 on a background
+            // thread so the UI stays responsive. FFmpegBridge copies video as-is and
+            // transcodes incompatible audio (e.g. Vorbis) to AAC.
             osdView.show(message: "Remuxing \(url.pathExtension.uppercased())…", duration: 3.0)
             let tempURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString)
@@ -202,6 +213,8 @@ class PlayerViewController: NSViewController {
                         self?.playWithEngine(engine, url: tempURL)
                         self?.osdView.show(message: "Playing")
                     } else {
+                        // Fallback: try playing the original file directly — AVPlayer
+                        // may partially support it (e.g. audio-only)
                         self?.playWithEngine(engine, url: url)
                     }
                 }
@@ -211,6 +224,10 @@ class PlayerViewController: NSViewController {
 
     private var playbackStatusObservation: NSKeyValueObservation?
 
+    /// Wires the engine to the video view and waits for .readyToPlay before auto-playing.
+    /// We observe the item status here (in addition to AVPlayerEngine's own observation)
+    /// because the VC needs to resize the window to match the video's native aspect ratio
+    /// — that info is only available after the asset header is parsed.
     private func playWithEngine(_ engine: AVPlayerEngine, url: URL) {
         print("[AwesomePlayer] Opening: \(url.path)")
         engine.open(url: url)
@@ -230,6 +247,7 @@ class PlayerViewController: NSViewController {
                 engine.play()
                 self.controlBarView.setPlaying(true)
 
+                // Resize window to fit video at up to 70% of screen, capped at native resolution
                 if let window = self.view.window as? PlayerWindow, let videoSize = engine.videoSize {
                     window.setAspectRatio(videoSize)
                     let screenFrame = NSScreen.main?.visibleFrame ?? .zero
@@ -350,6 +368,8 @@ extension PlayerViewController: AVPlayerEngineDelegate {
     }
 }
 
+/// Separate view for drag-and-drop so the root view owns the drag registration
+/// independently of PlayerViewController's subview hierarchy.
 // MARK: - Drag and Drop View
 
 class DragDropView: NSView {

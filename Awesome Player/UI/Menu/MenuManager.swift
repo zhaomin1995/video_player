@@ -89,7 +89,7 @@ class MenuManager {
         let menuItem = NSMenuItem()
         let menu = NSMenu()
 
-        menu.addItem(withTitle: "About Awesome Player", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: "About Awesome Player", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Preferences…", action: #selector(AppDelegate.showPreferences(_:)), keyEquivalent: ",")
         menu.addItem(.separator())

@@ -1,3 +1,8 @@
+/// Wraps AVPlayer with KVO-based status tracking and periodic time observation.
+/// Uses modern `NSKeyValueObservation` (block-based KVO) to avoid the fragile
+/// selector-based `observeValue(forKeyPath:)` pattern. Duration is loaded
+/// asynchronously via `AVAsset.load(_:)` because synchronous access blocks
+/// the main thread for network/large assets.
 import AVFoundation
 import Cocoa
 
@@ -13,6 +18,7 @@ class AVPlayerEngine: NSObject {
     private(set) var player: AVPlayer?
     private var playerItem: AVPlayerItem?
     private var timeObserver: Any?
+    // Block-based KVO observations — automatically invalidated when set to nil
     private var statusObservation: NSKeyValueObservation?
     private var rateObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
@@ -21,6 +27,7 @@ class AVPlayerEngine: NSObject {
         player?.rate != 0
     }
 
+    /// Cache duration to avoid repeated CMTime conversions on every time tick
     private var cachedDuration: Double = 0
 
     var duration: Double {
@@ -55,6 +62,7 @@ class AVPlayerEngine: NSObject {
 
     var videoSize: NSSize? {
         guard let track = playerItem?.asset.tracks(withMediaType: .video).first else { return nil }
+        // Apply preferredTransform to handle rotated videos (e.g. portrait iPhone footage)
         let size = track.naturalSize.applying(track.preferredTransform)
         return NSSize(width: abs(size.width), height: abs(size.height))
     }
@@ -79,6 +87,8 @@ class AVPlayerEngine: NSObject {
         observeStatus()
         observeItemStatus()
 
+        // Load duration asynchronously — AVAsset.duration blocks until the
+        // asset header is fully parsed, which is slow for large/network files.
         Task {
             if let dur = try? await asset.load(.duration) {
                 let secs = dur.seconds
@@ -103,6 +113,8 @@ class AVPlayerEngine: NSObject {
         delegate?.playerEngineDidUpdateStatus(isPlaying: false)
     }
 
+    /// Tears down everything — must nil out KVO observations before releasing
+    /// the player, otherwise observers fire on a deallocated object.
     func stop() {
         if let observer = timeObserver {
             player?.removeTimeObserver(observer)
@@ -120,6 +132,7 @@ class AVPlayerEngine: NSObject {
     func seek(by seconds: Double) {
         guard let player = player else { return }
         let current = player.currentTime()
+        // toleranceBefore/After: .zero for frame-accurate seeking (no snapping to keyframes)
         let target = CMTimeAdd(current, CMTimeMakeWithSeconds(seconds, preferredTimescale: 600))
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
     }
@@ -158,6 +171,7 @@ class AVPlayerEngine: NSObject {
         )
     }
 
+    /// Track rate changes to detect play/pause initiated externally (e.g. AirPlay remote)
     private func observeStatus() {
         rateObservation = player?.observe(\.rate, options: [.new]) { [weak self] player, _ in
             DispatchQueue.main.async {
@@ -166,6 +180,9 @@ class AVPlayerEngine: NSObject {
         }
     }
 
+    /// Observe .readyToPlay to grab the final duration — the async Task in open()
+    /// may resolve first for local files, but this handles cases where it doesn't
+    /// (e.g. the asset load was cancelled or the item resolves from a different source).
     private func observeItemStatus() {
         itemStatusObservation = playerItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
             print("[AVPlayerEngine] Item status changed: \(item.status.rawValue) error: \(item.error?.localizedDescription ?? "none")")

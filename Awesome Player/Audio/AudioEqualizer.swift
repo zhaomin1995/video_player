@@ -1,8 +1,12 @@
+/// 10-band parametric equalizer wrapping AVAudioUnitEQ. Uses standard ISO center
+/// frequencies (32 Hz - 16 kHz) that match most hardware/software EQ implementations.
+/// Presets store gain values in dB per band; bandwidth of 1.0 octave per band gives
+/// smooth overlap between adjacent bands without gaps or excessive peaking.
 import AVFoundation
 
 struct EQPreset {
     let name: String
-    let gains: [Float] // 10 bands
+    let gains: [Float] // 10 bands, values in dB
 }
 
 class AudioEqualizer {

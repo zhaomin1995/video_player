@@ -1,3 +1,7 @@
+/// Bottom control bar with two visual modes:
+/// - Welcome screen: transparent background, gradient scrim hidden
+/// - Active playback: opaque dark background with a gradient scrim that fades
+///   from transparent (top) to dark (bottom) so controls remain legible over bright video
 import Cocoa
 import AVFoundation
 
@@ -13,7 +17,9 @@ protocol ControlBarDelegate: AnyObject {
 class ControlBarView: NSView {
     weak var delegate: ControlBarDelegate?
 
+    /// Semi-transparent gradient behind controls so they're readable over any video content
     private let gradientView = GradientScrimView()
+    /// Container for all control elements; background toggled between clear and opaque
     private let effectView = NSView()
     private let seekSlider = SeekSliderView()
     private let playbackButtons = PlaybackButtons()
@@ -147,6 +153,8 @@ class ControlBarView: NSView {
         window?.toggleFullScreen(nil)
     }
 
+    /// Switch between transparent (welcome) and opaque (playing) control bar appearance.
+    /// The gradient scrim is only needed during playback to darken the video behind controls.
     func setVideoActive(_ active: Bool) {
         if active {
             effectView.layer?.backgroundColor = NSColor(white: 0.1, alpha: 0.95).cgColor
