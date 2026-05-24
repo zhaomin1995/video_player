@@ -60,6 +60,8 @@ class VLCPlayerEngine {
         }
     }
 
+    private var equalizer: OpaquePointer?
+
     var videoSize: NSSize? {
         guard let p = player else { return nil }
         var w: UInt32 = 0, h: UInt32 = 0
@@ -96,7 +98,11 @@ class VLCPlayerEngine {
         }
     }
 
-    deinit { stop() }
+    deinit {
+        stop()
+        if let inst = instance { libvlc_release(inst) }
+        instance = nil
+    }
 
     func open(url: URL) -> Bool {
         guard let inst = instance else { return false }
@@ -155,6 +161,10 @@ class VLCPlayerEngine {
     func stop() {
         timeUpdateTimer?.invalidate()
         timeUpdateTimer = nil
+        if let eq = equalizer {
+            libvlc_audio_equalizer_release(eq)
+            equalizer = nil
+        }
         if let p = player {
             libvlc_media_player_stop(p)
             libvlc_media_player_release(p)
@@ -163,6 +173,165 @@ class VLCPlayerEngine {
         player = nil
         media = nil
         isPlaying = false
+    }
+
+    // MARK: - Track Switching
+
+    struct TrackInfo {
+        let id: Int
+        let name: String
+    }
+
+    func getAudioTracks() -> [TrackInfo] {
+        guard let p = player else { return [] }
+        return parseTrackDescriptions(libvlc_audio_get_track_description(p))
+    }
+
+    func getSubtitleTracks() -> [TrackInfo] {
+        guard let p = player else { return [] }
+        return parseTrackDescriptions(libvlc_video_get_spu_description(p))
+    }
+
+    func getVideoTracks() -> [TrackInfo] {
+        guard let p = player else { return [] }
+        return parseTrackDescriptions(libvlc_video_get_track_description(p))
+    }
+
+    func getCurrentAudioTrack() -> Int {
+        guard let p = player else { return -1 }
+        return Int(libvlc_audio_get_track(p))
+    }
+
+    func getCurrentSubtitleTrack() -> Int {
+        guard let p = player else { return -1 }
+        return Int(libvlc_video_get_spu(p))
+    }
+
+    func setAudioTrack(_ trackId: Int) {
+        guard let p = player else { return }
+        libvlc_audio_set_track(p, Int32(trackId))
+    }
+
+    func setSubtitleTrack(_ trackId: Int) {
+        guard let p = player else { return }
+        libvlc_video_set_spu(p, Int32(trackId))
+    }
+
+    func setVideoTrack(_ trackId: Int) {
+        guard let p = player else { return }
+        libvlc_video_set_track(p, Int32(trackId))
+    }
+
+    func addSubtitleFile(_ path: String) {
+        guard let p = player else { return }
+        let uri = URL(fileURLWithPath: path).absoluteString
+        libvlc_media_player_add_slave(p, libvlc_media_slave_type_subtitle, uri, 1)
+    }
+
+    private func parseTrackDescriptions(_ head: UnsafeMutablePointer<libvlc_track_description_t>?) -> [TrackInfo] {
+        var tracks: [TrackInfo] = []
+        var current = head
+        while let desc = current {
+            let name: String
+            if let psz = desc.pointee.psz_name {
+                name = String(cString: psz)
+            } else {
+                name = "Track \(desc.pointee.i_id)"
+            }
+            tracks.append(TrackInfo(id: Int(desc.pointee.i_id), name: name))
+            current = desc.pointee.p_next
+        }
+        if let head = head {
+            libvlc_track_description_list_release(head)
+        }
+        return tracks
+    }
+
+    // MARK: - Equalizer
+
+    func setEqualizer(presetIndex: Int) {
+        guard let p = player else { return }
+        if let eq = equalizer { libvlc_audio_equalizer_release(eq) }
+        equalizer = libvlc_audio_equalizer_new_from_preset(UInt32(presetIndex))
+        if let eq = equalizer {
+            libvlc_media_player_set_equalizer(p, eq)
+        }
+    }
+
+    func disableEqualizer() {
+        guard let p = player else { return }
+        libvlc_media_player_set_equalizer(p, nil)
+        if let eq = equalizer {
+            libvlc_audio_equalizer_release(eq)
+            equalizer = nil
+        }
+    }
+
+    // MARK: - Audio Delay
+
+    func setAudioDelay(seconds: Double) {
+        guard let p = player else { return }
+        libvlc_audio_set_delay(p, Int64(seconds * 1_000_000))
+    }
+
+    func getAudioDelay() -> Double {
+        guard let p = player else { return 0 }
+        return Double(libvlc_audio_get_delay(p)) / 1_000_000
+    }
+
+    // MARK: - Snapshot
+
+    func takeSnapshot(path: String, width: UInt32 = 0, height: UInt32 = 0) -> Bool {
+        guard let p = player else { return false }
+        return libvlc_video_take_snapshot(p, 0, path, width, height) == 0
+    }
+
+    // MARK: - Video Adjustments
+
+    func setVideoAdjust(enabled: Bool) {
+        guard let p = player else { return }
+        libvlc_video_set_adjust_int(p, UInt32(libvlc_adjust_Enable), enabled ? 1 : 0)
+    }
+
+    func setBrightness(_ value: Float) {
+        guard let p = player else { return }
+        libvlc_video_set_adjust_int(p, UInt32(libvlc_adjust_Enable), 1)
+        libvlc_video_set_adjust_float(p, UInt32(libvlc_adjust_Brightness), value)
+    }
+
+    func setContrast(_ value: Float) {
+        guard let p = player else { return }
+        libvlc_video_set_adjust_int(p, UInt32(libvlc_adjust_Enable), 1)
+        libvlc_video_set_adjust_float(p, UInt32(libvlc_adjust_Contrast), value)
+    }
+
+    func setSaturation(_ value: Float) {
+        guard let p = player else { return }
+        libvlc_video_set_adjust_int(p, UInt32(libvlc_adjust_Enable), 1)
+        libvlc_video_set_adjust_float(p, UInt32(libvlc_adjust_Saturation), value)
+    }
+
+    func setHue(_ value: Float) {
+        guard let p = player else { return }
+        libvlc_video_set_adjust_int(p, UInt32(libvlc_adjust_Enable), 1)
+        libvlc_video_set_adjust_float(p, UInt32(libvlc_adjust_Hue), value)
+    }
+
+    func setGamma(_ value: Float) {
+        guard let p = player else { return }
+        libvlc_video_set_adjust_int(p, UInt32(libvlc_adjust_Enable), 1)
+        libvlc_video_set_adjust_float(p, UInt32(libvlc_adjust_Gamma), value)
+    }
+
+    // MARK: - Deinterlace
+
+    func setDeinterlace(mode: String?) {
+        guard let p = player else { return }
+        if let mode = mode {
+            libvlc_video_set_deinterlace(p, mode)
+        } else {
+            libvlc_video_set_deinterlace(p, nil)
+        }
     }
 
     private func startTimeUpdates() {

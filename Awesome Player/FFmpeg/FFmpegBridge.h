@@ -34,6 +34,7 @@ typedef struct {
 
 + (void)initialize;
 + (DVPMediaProbeResult)probeFile:(NSString *)path;
++ (nullable NSString *)videoCodecNameForFile:(NSString *)path;
 + (NSArray<NSDictionary *> *)audioTracksForFile:(NSString *)path;
 + (NSArray<NSDictionary *> *)subtitleTracksForFile:(NSString *)path;
 

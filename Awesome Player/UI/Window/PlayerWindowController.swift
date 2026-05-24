@@ -2,7 +2,7 @@ import Cocoa
 
 class PlayerWindowController: NSWindowController {
     let playerViewController = PlayerViewController()
-    private let titleBarView = TitleBarView()
+    let titleBarView = TitleBarView()
     private var titleBarTopConstraint: NSLayoutConstraint?
     private var mouseIdleTimer: Timer?
     private var controlsVisible = true
@@ -83,6 +83,9 @@ class PlayerWindowController: NSWindowController {
     func openFile(url: URL) {
         let filename = url.deletingPathExtension().lastPathComponent
         titleBarView.setTitle(filename)
+        if url.isFileURL {
+            RecentDocumentsMenuDelegate.addRecentFile(url)
+        }
         playerViewController.openFile(url: url)
     }
 

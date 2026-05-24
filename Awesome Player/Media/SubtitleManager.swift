@@ -16,6 +16,11 @@ class SubtitleManager {
         currentIndex = 0
     }
 
+    func loadSubtitleFromSRTText(_ srtText: String) {
+        entries = SubtitleParser.parseSRTString(srtText)
+        currentIndex = 0
+    }
+
     func subtitle(at time: TimeInterval) -> SubtitleEntry? {
         let adjustedTime = time + delay
 

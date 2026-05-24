@@ -345,6 +345,8 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
         ("Save screenshot", "⌥⌘S"),
     ]
     private var editingRow: Int? = nil
+    private var keyMonitor: Any?
+    private static let shortcutsKey = "AwesomePlayer_CustomShortcuts"
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -356,6 +358,8 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
 
         addSectionHeader(stack, "Escape Key")
         addPopupRow(stack, "Escape key action:", key: Defaults.escapeKeyBehavior, items: ["Exit Fullscreen", "Close Panel", "Stop Playback"])
+
+        loadShortcuts()
 
         addSectionHeader(stack, "Keyboard Shortcuts")
         let hint = NSTextField(labelWithString: "Double-click a shortcut to change it")
@@ -432,10 +436,16 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
     @objc private func shortcutDoubleClicked() {
         let row = tableView.clickedRow
         guard row >= 0 else { return }
+
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
+
         editingRow = row
         tableView.reloadData()
 
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self, let editing = self.editingRow else { return event }
             var parts: [String] = []
             if event.modifierFlags.contains(.control) { parts.append("⌃") }
@@ -447,7 +457,27 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
             self.shortcuts[editing].key = parts.joined()
             self.editingRow = nil
             self.tableView.reloadData()
+            self.saveShortcuts()
+
+            if let monitor = self.keyMonitor {
+                NSEvent.removeMonitor(monitor)
+                self.keyMonitor = nil
+            }
             return nil
+        }
+    }
+
+    private func saveShortcuts() {
+        let data = shortcuts.map { ["action": $0.action, "key": $0.key] }
+        UserDefaults.standard.set(data, forKey: Self.shortcutsKey)
+    }
+
+    private func loadShortcuts() {
+        guard let data = UserDefaults.standard.array(forKey: Self.shortcutsKey) as? [[String: String]] else { return }
+        for (i, dict) in data.enumerated() {
+            if i < shortcuts.count, let key = dict["key"] {
+                shortcuts[i].key = key
+            }
         }
     }
 
@@ -469,6 +499,13 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
         ]
         editingRow = nil
         tableView.reloadData()
+        UserDefaults.standard.removeObject(forKey: Self.shortcutsKey)
+    }
+
+    deinit {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
     }
 }
 

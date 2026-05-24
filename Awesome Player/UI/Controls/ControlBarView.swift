@@ -12,6 +12,8 @@ protocol ControlBarDelegate: AnyObject {
     func controlBarSpeedChanged(to speed: Float)
     func controlBarSeekBackward()
     func controlBarSeekForward()
+    func controlBarPreviousClicked()
+    func controlBarNextClicked()
 }
 
 class ControlBarView: NSView {
@@ -66,6 +68,12 @@ class ControlBarView: NSView {
         }
         playbackButtons.onSeekForward = { [weak self] in
             self?.delegate?.controlBarSeekForward()
+        }
+        playbackButtons.onPrevious = { [weak self] in
+            self?.delegate?.controlBarPreviousClicked()
+        }
+        playbackButtons.onNext = { [weak self] in
+            self?.delegate?.controlBarNextClicked()
         }
         effectView.addSubview(playbackButtons)
 
@@ -178,6 +186,7 @@ class ControlBarView: NSView {
 
     func setDuration(_ duration: Double) {
         durationLabel.stringValue = " / \(formatTime(duration))"
+        seekSlider.duration = duration
     }
 
     func setVolume(_ volume: Float) {

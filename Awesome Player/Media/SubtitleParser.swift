@@ -1,4 +1,4 @@
-import Foundation
+import Cocoa
 
 struct SubtitleEntry {
     let startTime: TimeInterval
@@ -19,6 +19,10 @@ class SubtitleParser {
             return []
         }
         return parseContent(content, format: ext)
+    }
+
+    static func parseSRTString(_ content: String) -> [SubtitleEntry] {
+        return parseSRT(content)
     }
 
     static func parseContent(_ content: String, format: String) -> [SubtitleEntry] {
@@ -111,7 +115,56 @@ class SubtitleParser {
 
     // MARK: - ASS/SSA Parser
 
+    private static var assStyles: [String: ASSStyle] = [:]
+
+    struct ASSStyle {
+        var fontName: String = ""
+        var fontSize: CGFloat = 24
+        var primaryColor: NSColor = .white
+        var bold: Bool = false
+        var italic: Bool = false
+    }
+
+    private static func parseASSStyles(_ content: String) {
+        assStyles.removeAll()
+        let lines = content.components(separatedBy: "\n")
+        var inStyles = false
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("[V4+ Styles]") || trimmed.hasPrefix("[V4 Styles]") {
+                inStyles = true; continue
+            }
+            if trimmed.hasPrefix("[") { inStyles = false; continue }
+            if !inStyles || !trimmed.hasPrefix("Style:") { continue }
+
+            let fields = trimmed.dropFirst("Style:".count).components(separatedBy: ",")
+            guard fields.count >= 7 else { continue }
+            let name = fields[0].trimmingCharacters(in: .whitespaces)
+            var style = ASSStyle()
+            style.fontName = fields[1].trimmingCharacters(in: .whitespaces)
+            style.fontSize = CGFloat(Double(fields[2].trimmingCharacters(in: .whitespaces)) ?? 24)
+            style.primaryColor = parseASSColor(fields[3].trimmingCharacters(in: .whitespaces))
+            style.bold = fields[6].trimmingCharacters(in: .whitespaces) == "-1"
+            style.italic = fields.count > 7 && fields[7].trimmingCharacters(in: .whitespaces) == "-1"
+            assStyles[name] = style
+        }
+    }
+
+    private static func parseASSColor(_ str: String) -> NSColor {
+        var hex = str.replacingOccurrences(of: "&H", with: "").replacingOccurrences(of: "&", with: "")
+        while hex.count < 8 { hex = "0" + hex }
+        // ASS color format: &HAABBGGRR (alpha, blue, green, red)
+        guard let val = UInt64(hex, radix: 16) else { return .white }
+        let r = CGFloat(val & 0xFF) / 255.0
+        let g = CGFloat((val >> 8) & 0xFF) / 255.0
+        let b = CGFloat((val >> 16) & 0xFF) / 255.0
+        return NSColor(red: r, green: g, blue: b, alpha: 1.0)
+    }
+
     private static func parseASS(_ content: String) -> [SubtitleEntry] {
+        parseASSStyles(content)
+
         var entries: [SubtitleEntry] = []
         let lines = content.components(separatedBy: "\n")
 
@@ -128,15 +181,43 @@ class SubtitleParser {
                 continue
             }
 
-            let text = fields[9...].joined(separator: ",")
-                .replacingOccurrences(of: "\\\\N", with: "\n")
-                .replacingOccurrences(of: "\\\\n", with: "\n")
-                .replacingOccurrences(of: "\\{[^}]*\\}", with: "", options: .regularExpression)
+            let styleName = fields[3].trimmingCharacters(in: .whitespaces)
+            let rawText = fields[9...].joined(separator: ",")
+                .replacingOccurrences(of: "\\N", with: "\n")
+                .replacingOccurrences(of: "\\n", with: "\n")
 
-            entries.append(SubtitleEntry(startTime: start, endTime: end, text: text, attributedText: nil))
+            let plainText = rawText.replacingOccurrences(of: "\\{[^}]*\\}", with: "", options: .regularExpression)
+            let attributed = buildAttributedString(rawText, styleName: styleName)
+
+            entries.append(SubtitleEntry(startTime: start, endTime: end, text: plainText, attributedText: attributed))
         }
 
         return entries.sorted { $0.startTime < $1.startTime }
+    }
+
+    private static func buildAttributedString(_ rawText: String, styleName: String) -> NSAttributedString {
+        let style = assStyles[styleName] ?? ASSStyle()
+        let cleanText = rawText.replacingOccurrences(of: "\\{[^}]*\\}", with: "", options: .regularExpression)
+
+        var traits: NSFontDescriptor.SymbolicTraits = []
+        if style.bold { traits.insert(.bold) }
+        if style.italic { traits.insert(.italic) }
+
+        let baseFont: NSFont
+        if !style.fontName.isEmpty, let f = NSFont(name: style.fontName, size: style.fontSize) {
+            baseFont = f
+        } else {
+            baseFont = .systemFont(ofSize: style.fontSize, weight: style.bold ? .bold : .regular)
+        }
+
+        let descriptor = baseFont.fontDescriptor.withSymbolicTraits(traits)
+        let font = NSFont(descriptor: descriptor, size: style.fontSize) ?? baseFont
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: style.primaryColor,
+        ]
+        return NSAttributedString(string: cleanText, attributes: attrs)
     }
 
     private static func parseASSTime(_ str: String) -> TimeInterval? {

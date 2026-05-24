@@ -17,6 +17,9 @@
 		A10011 /* SubtitleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10011 /* SubtitleManager.swift */; };
 		A10012 /* SubtitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10012 /* SubtitleParser.swift */; };
 		A10013 /* ABLoopController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10013 /* ABLoopController.swift */; };
+		24C94DAE03294CF197717245 /* NowPlayingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6342BF7EECB4E2C93F2FBA8 /* NowPlayingController.swift */; };
+		24C94DAF03294CF197717246 /* ResumeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6342BF8EECB4E2C93F2FBA9 /* ResumeManager.swift */; };
+		D6342BFB0000000000000002 /* PlaylistPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6342BFA0000000000000001 /* PlaylistPanelView.swift */; };
 		A10018 /* CastButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10018 /* CastButton.swift */; };
 		A10019 /* ControlBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10019 /* ControlBarView.swift */; };
 		A10020 /* PlaybackButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10020 /* PlaybackButtons.swift */; };
@@ -56,6 +59,9 @@
 		F10011 /* SubtitleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleManager.swift; sourceTree = "<group>"; };
 		F10012 /* SubtitleParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleParser.swift; sourceTree = "<group>"; };
 		F10013 /* ABLoopController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ABLoopController.swift; sourceTree = "<group>"; };
+		D6342BF7EECB4E2C93F2FBA8 /* NowPlayingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingController.swift; sourceTree = "<group>"; };
+		D6342BF8EECB4E2C93F2FBA9 /* ResumeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeManager.swift; sourceTree = "<group>"; };
+		D6342BFA0000000000000001 /* PlaylistPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistPanelView.swift; sourceTree = "<group>"; };
 		F10018 /* CastButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastButton.swift; sourceTree = "<group>"; };
 		F10019 /* ControlBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlBarView.swift; sourceTree = "<group>"; };
 		F10020 /* PlaybackButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackButtons.swift; sourceTree = "<group>"; };
@@ -134,6 +140,8 @@
 			isa = PBXGroup;
 			children = (
 				F10013 /* ABLoopController.swift */,
+				D6342BF7EECB4E2C93F2FBA8 /* NowPlayingController.swift */,
+				D6342BF8EECB4E2C93F2FBA9 /* ResumeManager.swift */,
 				F10014 /* AVPlayerEngine.swift */,
 				F10080 /* VLCPlayerEngine.swift */,
 			);
@@ -203,6 +211,7 @@
 				F10027 /* SubtitleOverlayView.swift */,
 				F10028 /* VideoView.swift */,
 				F10070 /* WelcomeView.swift */,
+				D6342BFA0000000000000001 /* PlaylistPanelView.swift */,
 			);
 			path = Player;
 			sourceTree = "<group>";
@@ -367,6 +376,9 @@
 				A10011 /* SubtitleManager.swift in Sources */,
 				A10012 /* SubtitleParser.swift in Sources */,
 				A10013 /* ABLoopController.swift in Sources */,
+				24C94DAE03294CF197717245 /* NowPlayingController.swift in Sources */,
+				24C94DAF03294CF197717246 /* ResumeManager.swift in Sources */,
+				D6342BFB0000000000000002 /* PlaylistPanelView.swift in Sources */,
 				A10014 /* AVPlayerEngine.swift in Sources */,
 				A10080 /* VLCPlayerEngine.swift in Sources */,
 				E55EEC072FC230F3000EE159 /* AudioPassthroughManager.swift in Sources */,

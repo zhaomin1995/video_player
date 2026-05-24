@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowController: PlayerWindowController?
     private var preferencesController: PreferencesWindowController?
     private let castingManager = CastingManager()
+    let nowPlayingController = NowPlayingController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Defaults.registerDefaults()
@@ -16,6 +17,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController = PlayerWindowController()
         windowController?.showWindow(nil)
         windowController?.window?.makeKeyAndOrderFront(nil)
+
+        nowPlayingController.playerViewController = windowController?.playerViewController
+        nowPlayingController.setup()
 
         NSApp.activate(ignoringOtherApps: true)
 
@@ -44,6 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ sender: NSApplication, openFile filename: String) -> Bool {
         let url = URL(fileURLWithPath: filename)
+        RecentDocumentsMenuDelegate.addRecentFile(url)
         windowController?.openFile(url: url)
         return true
     }
@@ -51,6 +56,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
         for filename in filenames {
             let url = URL(fileURLWithPath: filename)
+            RecentDocumentsMenuDelegate.addRecentFile(url)
             windowController?.openFile(url: url)
             break
         }
@@ -65,6 +71,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.canChooseDirectories = false
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
+            RecentDocumentsMenuDelegate.addRecentFile(url)
             self?.windowController?.openFile(url: url)
         }
     }
@@ -72,16 +79,63 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openURL(_ sender: Any?) {
         let alert = NSAlert()
         alert.messageText = "Open URL"
-        alert.informativeText = "Enter a media URL:"
+        alert.informativeText = "Enter a media URL or YouTube/web link:"
         alert.addButton(withTitle: "Open")
         alert.addButton(withTitle: "Cancel")
         let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 400, height: 24))
-        input.placeholderString = "https://example.com/video.mp4"
+        input.placeholderString = "https://example.com/video.mp4 or YouTube URL"
         alert.accessoryView = input
         if alert.runModal() == .alertFirstButtonReturn,
-           !input.stringValue.isEmpty,
-           let url = URL(string: input.stringValue) {
-            windowController?.openFile(url: url)
+           !input.stringValue.isEmpty {
+            let urlString = input.stringValue
+            if let url = URL(string: urlString), isDirectMediaURL(urlString) {
+                windowController?.openFile(url: url)
+            } else {
+                resolveWithYTDLP(urlString)
+            }
+        }
+    }
+
+    private func isDirectMediaURL(_ url: String) -> Bool {
+        let mediaExts = ["mp4", "mkv", "avi", "mov", "m4v", "webm", "flv", "wmv", "mpg", "mpeg", "m4a", "mp3", "flac", "ogg"]
+        let lower = url.lowercased()
+        return mediaExts.contains(where: { lower.hasSuffix(".\($0)") })
+    }
+
+    private func resolveWithYTDLP(_ urlString: String) {
+        let ytdlpPaths = ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"]
+        guard let ytdlp = ytdlpPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
+            windowController?.playerViewController.showOSD("yt-dlp not found — install via: brew install yt-dlp", duration: 5.0)
+            return
+        }
+        windowController?.playerViewController.showOSD("Resolving URL…", duration: 10.0)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: ytdlp)
+            process.arguments = ["--get-url", "-f", "best", urlString]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = Pipe()
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !output.isEmpty,
+                   let resolvedURL = URL(string: output.components(separatedBy: "\n").first ?? "") {
+                    DispatchQueue.main.async {
+                        self?.windowController?.openFile(url: resolvedURL)
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self?.windowController?.playerViewController.showOSD("Failed to resolve URL")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self?.windowController?.playerViewController.showOSD("yt-dlp error: \(error.localizedDescription)")
+                }
+            }
         }
     }
 
@@ -168,7 +222,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let item = sender as? NSMenuItem, let menu = item.menu else { return }
         for mi in menu.items { mi.state = .off }
         item.state = .on
-        UserDefaults.standard.set(menu.index(of: item), forKey: Defaults.defaultEQPreset)
+        let index = menu.index(of: item)
+        UserDefaults.standard.set(index, forKey: Defaults.defaultEQPreset)
+        windowController?.playerViewController.applyEQPreset(index)
         windowController?.playerViewController.showOSD("EQ: \(item.title)")
     }
 
@@ -303,6 +359,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func toggleShuffle(_ sender: Any?) {
         windowController?.playerViewController.toggleShuffle()
+    }
+
+    @objc func togglePlaylistPanel(_ sender: Any?) {
+        windowController?.playerViewController.togglePlaylistPanel()
     }
 
     @objc func previousTrack(_ sender: Any?) {

@@ -57,6 +57,101 @@ int libvlc_audio_set_volume(libvlc_media_player_t *p_mi, int i_volume);
 int libvlc_audio_get_mute(libvlc_media_player_t *p_mi);
 void libvlc_audio_set_mute(libvlc_media_player_t *p_mi, int status);
 
+// Audio delay (microseconds)
+int64_t libvlc_audio_get_delay(libvlc_media_player_t *p_mi);
+int libvlc_audio_set_delay(libvlc_media_player_t *p_mi, int64_t i_delay);
+
+// Audio equalizer
+typedef struct libvlc_equalizer_t libvlc_equalizer_t;
+
+unsigned libvlc_audio_equalizer_get_preset_count(void);
+const char *libvlc_audio_equalizer_get_preset_name(unsigned u_index);
+unsigned libvlc_audio_equalizer_get_band_count(void);
+float libvlc_audio_equalizer_get_band_frequency(unsigned u_index);
+
+libvlc_equalizer_t *libvlc_audio_equalizer_new(void);
+libvlc_equalizer_t *libvlc_audio_equalizer_new_from_preset(unsigned u_index);
+void libvlc_audio_equalizer_release(libvlc_equalizer_t *p_equalizer);
+
+int libvlc_audio_equalizer_set_preamp(libvlc_equalizer_t *p_eq, float f_preamp);
+float libvlc_audio_equalizer_get_preamp(libvlc_equalizer_t *p_eq);
+int libvlc_audio_equalizer_set_amp_at_index(libvlc_equalizer_t *p_eq, float f_amp, unsigned u_band);
+float libvlc_audio_equalizer_get_amp_at_index(libvlc_equalizer_t *p_eq, unsigned u_band);
+
+int libvlc_media_player_set_equalizer(libvlc_media_player_t *p_mi, libvlc_equalizer_t *p_eq);
+
+// Track descriptions (linked list)
+typedef struct libvlc_track_description_t {
+    int i_id;
+    char *psz_name;
+    struct libvlc_track_description_t *p_next;
+} libvlc_track_description_t;
+
+void libvlc_track_description_list_release(libvlc_track_description_t *p_track_description);
+
+// Audio tracks
+int libvlc_audio_get_track_count(libvlc_media_player_t *p_mi);
+libvlc_track_description_t *libvlc_audio_get_track_description(libvlc_media_player_t *p_mi);
+int libvlc_audio_get_track(libvlc_media_player_t *p_mi);
+int libvlc_audio_set_track(libvlc_media_player_t *p_mi, int i_track);
+
+// Video tracks
+int libvlc_video_get_track_count(libvlc_media_player_t *p_mi);
+libvlc_track_description_t *libvlc_video_get_track_description(libvlc_media_player_t *p_mi);
+int libvlc_video_get_track(libvlc_media_player_t *p_mi);
+int libvlc_video_set_track(libvlc_media_player_t *p_mi, int i_track);
+
+// Subtitle (SPU) tracks
+int libvlc_video_get_spu_count(libvlc_media_player_t *p_mi);
+libvlc_track_description_t *libvlc_video_get_spu_description(libvlc_media_player_t *p_mi);
+int libvlc_video_get_spu(libvlc_media_player_t *p_mi);
+int libvlc_video_set_spu(libvlc_media_player_t *p_mi, int i_spu);
+int libvlc_video_set_subtitle_file(libvlc_media_player_t *p_mi, const char *psz_subtitle);
+
+// Subtitle delay (microseconds)
+int64_t libvlc_video_get_spu_delay(libvlc_media_player_t *p_mi);
+int libvlc_video_set_spu_delay(libvlc_media_player_t *p_mi, int64_t i_delay);
+
+// Deinterlace
+void libvlc_video_set_deinterlace(libvlc_media_player_t *p_mi, const char *psz_mode);
+
+// Video adjustments
+enum {
+    libvlc_adjust_Enable = 0,
+    libvlc_adjust_Contrast,
+    libvlc_adjust_Brightness,
+    libvlc_adjust_Hue,
+    libvlc_adjust_Saturation,
+    libvlc_adjust_Gamma
+};
+
+int libvlc_video_get_adjust_int(libvlc_media_player_t *p_mi, unsigned option);
+void libvlc_video_set_adjust_int(libvlc_media_player_t *p_mi, unsigned option, int value);
+float libvlc_video_get_adjust_float(libvlc_media_player_t *p_mi, unsigned option);
+void libvlc_video_set_adjust_float(libvlc_media_player_t *p_mi, unsigned option, float value);
+
+// Video aspect ratio / crop
+char *libvlc_video_get_aspect_ratio(libvlc_media_player_t *p_mi);
+void libvlc_video_set_aspect_ratio(libvlc_media_player_t *p_mi, const char *psz_aspect);
+char *libvlc_video_get_crop_geometry(libvlc_media_player_t *p_mi);
+void libvlc_video_set_crop_geometry(libvlc_media_player_t *p_mi, const char *psz_geometry);
+float libvlc_video_get_scale(libvlc_media_player_t *p_mi);
+void libvlc_video_set_scale(libvlc_media_player_t *p_mi, float f_factor);
+
+// Snapshot
+int libvlc_video_take_snapshot(libvlc_media_player_t *p_mi, unsigned num,
+                               const char *psz_filepath, unsigned int i_width, unsigned int i_height);
+
+// External subtitle/audio slave
+typedef enum libvlc_media_slave_type_t {
+    libvlc_media_slave_type_subtitle = 0,
+    libvlc_media_slave_type_audio
+} libvlc_media_slave_type_t;
+
+int libvlc_media_player_add_slave(libvlc_media_player_t *p_mi,
+                                  libvlc_media_slave_type_t i_type,
+                                  const char *psz_uri, int b_select);
+
 #ifdef __cplusplus
 }
 #endif

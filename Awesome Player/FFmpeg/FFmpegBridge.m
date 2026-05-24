@@ -85,6 +85,39 @@
     return result;
 }
 
++ (nullable NSString *)videoCodecNameForFile:(NSString *)path {
+#if HAS_FFMPEG
+    AVFormatContext *fmt_ctx = NULL;
+    if (avformat_open_input(&fmt_ctx, [path UTF8String], NULL, NULL) < 0) return nil;
+    avformat_find_stream_info(fmt_ctx, NULL);
+
+    NSString *name = nil;
+    for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
+        if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+            const AVCodecDescriptor *desc = avcodec_descriptor_get(fmt_ctx->streams[i]->codecpar->codec_id);
+            if (desc && desc->name) {
+                // Map common names to friendly display names
+                NSString *raw = [NSString stringWithUTF8String:desc->name];
+                if ([raw isEqualToString:@"h264"]) name = @"H.264";
+                else if ([raw isEqualToString:@"hevc"]) name = @"HEVC";
+                else if ([raw isEqualToString:@"vp9"]) name = @"VP9";
+                else if ([raw isEqualToString:@"av1"]) name = @"AV1";
+                else if ([raw isEqualToString:@"vp8"]) name = @"VP8";
+                else if ([raw isEqualToString:@"mpeg2video"]) name = @"MPEG-2";
+                else if ([raw isEqualToString:@"mpeg4"]) name = @"MPEG-4";
+                else if ([raw isEqualToString:@"prores"]) name = @"ProRes";
+                else name = [raw uppercaseString];
+            }
+            break;
+        }
+    }
+    avformat_close_input(&fmt_ctx);
+    return name;
+#else
+    return nil;
+#endif
+}
+
 + (NSArray<NSDictionary *> *)audioTracksForFile:(NSString *)path {
     NSMutableArray *tracks = [NSMutableArray array];
 
@@ -528,8 +561,119 @@ static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
 + (nullable NSString *)extractSubtitleTrack:(int)trackIndex
                                    fromFile:(NSString *)path
                                       error:(NSError **)error {
-    // TODO: Extract subtitle track as text
+#if HAS_FFMPEG
+    AVFormatContext *fmt_ctx = NULL;
+    if (avformat_open_input(&fmt_ctx, [path UTF8String], NULL, NULL) < 0) {
+        if (error) *error = [NSError errorWithDomain:@"FFmpegBridge" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"Failed to open file"}];
+        return nil;
+    }
+    avformat_find_stream_info(fmt_ctx, NULL);
+
+    // Find the subtitle stream at the given track index
+    int subIndex = 0;
+    int streamIdx = -1;
+    for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
+        if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE) {
+            if (subIndex == trackIndex) { streamIdx = i; break; }
+            subIndex++;
+        }
+    }
+
+    if (streamIdx < 0) {
+        avformat_close_input(&fmt_ctx);
+        if (error) *error = [NSError errorWithDomain:@"FFmpegBridge" code:-2 userInfo:@{NSLocalizedDescriptionKey: @"Track not found"}];
+        return nil;
+    }
+
+    AVStream *stream = fmt_ctx->streams[streamIdx];
+    enum AVCodecID codecId = stream->codecpar->codec_id;
+
+    // Only extract text-based subtitles
+    if (codecId != AV_CODEC_ID_SRT && codecId != AV_CODEC_ID_SUBRIP &&
+        codecId != AV_CODEC_ID_ASS && codecId != AV_CODEC_ID_SSA &&
+        codecId != AV_CODEC_ID_WEBVTT && codecId != AV_CODEC_ID_MOV_TEXT &&
+        codecId != AV_CODEC_ID_TEXT) {
+        avformat_close_input(&fmt_ctx);
+        if (error) *error = [NSError errorWithDomain:@"FFmpegBridge" code:-3 userInfo:@{NSLocalizedDescriptionKey: @"Bitmap subtitle format — not extractable as text"}];
+        return nil;
+    }
+
+    const AVCodec *codec = avcodec_find_decoder(codecId);
+    AVCodecContext *codecCtx = avcodec_alloc_context3(codec);
+    avcodec_parameters_to_context(codecCtx, stream->codecpar);
+    if (avcodec_open2(codecCtx, codec, NULL) < 0) {
+        avcodec_free_context(&codecCtx);
+        avformat_close_input(&fmt_ctx);
+        if (error) *error = [NSError errorWithDomain:@"FFmpegBridge" code:-4 userInfo:@{NSLocalizedDescriptionKey: @"Failed to open subtitle decoder"}];
+        return nil;
+    }
+
+    NSMutableString *srt = [NSMutableString string];
+    AVPacket *pkt = av_packet_alloc();
+    AVSubtitle sub;
+    int entryNum = 1;
+
+    while (av_read_frame(fmt_ctx, pkt) >= 0) {
+        if (pkt->stream_index != streamIdx) {
+            av_packet_unref(pkt);
+            continue;
+        }
+
+        int gotSub = 0;
+        avcodec_decode_subtitle2(codecCtx, &sub, &gotSub, pkt);
+
+        if (gotSub) {
+            // Calculate timestamps
+            double timeBase = av_q2d(stream->time_base);
+            double startTime = pkt->pts * timeBase;
+            double endTime = startTime + (sub.end_display_time > 0 ? sub.end_display_time / 1000.0 : (pkt->duration > 0 ? pkt->duration * timeBase : 3.0));
+
+            for (unsigned r = 0; r < sub.num_rects; r++) {
+                AVSubtitleRect *rect = sub.rects[r];
+                NSString *text = nil;
+
+                if (rect->type == SUBTITLE_ASS && rect->ass) {
+                    // ASS format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
+                    NSString *assLine = [NSString stringWithUTF8String:rect->ass];
+                    NSArray *parts = [assLine componentsSeparatedByString:@","];
+                    if (parts.count >= 10) {
+                        text = [[parts subarrayWithRange:NSMakeRange(9, parts.count - 9)] componentsJoinedByString:@","];
+                        // Strip ASS override tags
+                        NSRegularExpression *tagRegex = [NSRegularExpression regularExpressionWithPattern:@"\\{[^}]*\\}" options:0 error:nil];
+                        text = [tagRegex stringByReplacingMatchesInString:text options:0 range:NSMakeRange(0, text.length) withTemplate:@""];
+                        text = [text stringByReplacingOccurrencesOfString:@"\\N" withString:@"\n"];
+                        text = [text stringByReplacingOccurrencesOfString:@"\\n" withString:@"\n"];
+                    }
+                } else if (rect->type == SUBTITLE_TEXT && rect->text) {
+                    text = [NSString stringWithUTF8String:rect->text];
+                }
+
+                if (text && text.length > 0) {
+                    text = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                    int sh = (int)startTime / 3600, sm = ((int)startTime % 3600) / 60, ss = (int)startTime % 60, sms = (int)((startTime - (int)startTime) * 1000);
+                    int eh = (int)endTime / 3600, em = ((int)endTime % 3600) / 60, es = (int)endTime % 60, ems = (int)((endTime - (int)endTime) * 1000);
+
+                    [srt appendFormat:@"%d\n%02d:%02d:%02d,%03d --> %02d:%02d:%02d,%03d\n%@\n\n",
+                     entryNum, sh, sm, ss, sms, eh, em, es, ems, text];
+                    entryNum++;
+                }
+            }
+            avsubtitle_free(&sub);
+        }
+        av_packet_unref(pkt);
+    }
+
+    av_packet_free(&pkt);
+    avcodec_free_context(&codecCtx);
+    avformat_close_input(&fmt_ctx);
+
+    if (srt.length == 0) return nil;
+
+    NSLog(@"[FFmpegBridge] Extracted %d subtitle entries from track %d", entryNum - 1, trackIndex);
+    return [srt copy];
+#else
     return nil;
+#endif
 }
 
 @end

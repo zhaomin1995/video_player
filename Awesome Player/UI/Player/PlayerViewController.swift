@@ -15,6 +15,7 @@ class PlayerViewController: NSViewController {
     private let subtitleOverlayView = SubtitleOverlayView()
     private let osdView = OSDView()
     private var controlBarBottomConstraint: NSLayoutConstraint?
+    private var subtitleBottomConstraint: NSLayoutConstraint?
 
     var onMouseMoved: (() -> Void)?
     var onMouseExited: (() -> Void)?
@@ -24,7 +25,7 @@ class PlayerViewController: NSViewController {
 
     private var player: AVPlayer?
     private(set) var playerEngine: AVPlayerEngine?
-    private var vlcEngine: VLCPlayerEngine?
+    private(set) var vlcEngine: VLCPlayerEngine?
     private var timeObserver: Any?
 
     private let subtitleManager = SubtitleManager()
@@ -36,6 +37,8 @@ class PlayerViewController: NSViewController {
     private var videoFlippedV = false
     private var isFillScreen = false
     private var pipController: AVPictureInPictureController?
+    private var playlistPanel: PlaylistPanelView?
+    private var playlistPanelConstraint: NSLayoutConstraint?
     private var audioDelayOffset: Double = 0
     private let passthroughManager = AudioPassthroughManager()
 
@@ -136,12 +139,28 @@ class PlayerViewController: NSViewController {
     private func setupSubtitleOverlay() {
         subtitleOverlayView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(subtitleOverlayView)
+        let bottomOffset = subtitleBottomOffset()
+        let bottom = subtitleOverlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: bottomOffset)
+        subtitleBottomConstraint = bottom
         NSLayoutConstraint.activate([
             subtitleOverlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
             subtitleOverlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
-            subtitleOverlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -60),
+            bottom,
             subtitleOverlayView.heightAnchor.constraint(lessThanOrEqualToConstant: 120),
         ])
+    }
+
+    private func subtitleBottomOffset() -> CGFloat {
+        let pos = UserDefaults.standard.integer(forKey: Defaults.subtitlePosition)
+        switch pos {
+        case 1: return -20   // Bottom of screen
+        case 2: return -10   // Letterbox
+        default: return -60  // Bottom of video (with padding)
+        }
+    }
+
+    func updateSubtitlePosition() {
+        subtitleBottomConstraint?.constant = subtitleBottomOffset()
     }
 
     private func setupControlBar() {
@@ -264,6 +283,10 @@ class PlayerViewController: NSViewController {
             adjustSpeed(by: 0.25)
         case ("\\", []):
             setSpeed(1.0)
+        case (".", []):
+            stepFrame(forward: true)
+        case (",", []):
+            stepFrame(forward: false)
         default:
             super.keyDown(with: event)
         }
@@ -271,9 +294,64 @@ class PlayerViewController: NSViewController {
 
     override var acceptsFirstResponder: Bool { true }
 
+    // MARK: - Context Menu
+
+    override func rightMouseDown(with event: NSEvent) {
+        let menu = NSMenu()
+
+        let playPause = menu.addItem(
+            withTitle: (playerEngine?.isPlaying ?? vlcEngine?.isPlaying ?? false) ? "Pause" : "Play",
+            action: #selector(AppDelegate.togglePlayPause(_:)), keyEquivalent: "")
+        menu.addItem(.separator())
+
+        menu.addItem(withTitle: "Seek Forward 5s", action: #selector(AppDelegate.seekForward5(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: "Seek Backward 5s", action: #selector(AppDelegate.seekBackward5(_:)), keyEquivalent: "")
+        menu.addItem(.separator())
+
+        let audioTrack = NSMenuItem(title: "Audio Track", action: nil, keyEquivalent: "")
+        let audioSubmenu = NSMenu(title: "Audio Track")
+        audioSubmenu.delegate = TrackMenuDelegate.audio
+        audioTrack.submenu = audioSubmenu
+        menu.addItem(audioTrack)
+
+        let subTrack = NSMenuItem(title: "Subtitle Track", action: nil, keyEquivalent: "")
+        let subSubmenu = NSMenu(title: "Subtitle Track")
+        subSubmenu.delegate = TrackMenuDelegate.subtitle
+        subTrack.submenu = subSubmenu
+        menu.addItem(subTrack)
+
+        menu.addItem(.separator())
+
+        let speedItem = NSMenuItem(title: "Speed", action: nil, keyEquivalent: "")
+        let speedSubmenu = NSMenu(title: "Speed")
+        for speed in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0] {
+            speedSubmenu.addItem(withTitle: String(format: "%.2gx", speed),
+                                action: #selector(AppDelegate.setSpeed(_:)), keyEquivalent: "")
+        }
+        speedItem.submenu = speedSubmenu
+        menu.addItem(speedItem)
+
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Screenshot", action: #selector(AppDelegate.saveScreenshot(_:)), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Fullscreen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: "Picture in Picture", action: #selector(AppDelegate.togglePiP(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: "Always on Top", action: #selector(AppDelegate.toggleAlwaysOnTop(_:)), keyEquivalent: "")
+
+        NSMenu.popUpContextMenu(menu, with: event, for: view)
+    }
+
     // MARK: - Playback
 
+    private func saveCurrentPosition() {
+        guard let url = currentFileURL else { return }
+        let current = playerEngine?.currentTime ?? vlcEngine?.currentTime ?? 0
+        let dur = playerEngine?.duration ?? vlcEngine?.duration ?? 0
+        ResumeManager.savePosition(current, duration: dur, for: url)
+    }
+
     func openFile(url: URL) {
+        saveCurrentPosition()
         currentFileURL = url
         welcomeView.isHidden = true
         controlBarView.setVideoActive(true)
@@ -296,6 +374,7 @@ class PlayerViewController: NSViewController {
             let engine = AVPlayerEngine()
             playerEngine = engine
             engine.delegate = self
+            engine.useKeyframeSeeking = useKeyframeSeeking
             engine.volume = Float(vol > 0 ? vol : 1.0)
             controlBarView.setVolume(engine.volume)
             let speed = UserDefaults.standard.double(forKey: Defaults.defaultSpeed)
@@ -329,6 +408,14 @@ class PlayerViewController: NSViewController {
                 controlBarView.setDuration(engine.duration)
                 engine.volume = Float(vol > 0 ? vol : 1.0)
                 controlBarView.setVolume(engine.volume)
+                let speed = UserDefaults.standard.double(forKey: Defaults.defaultSpeed)
+                if speed > 0 && speed != 1.0 {
+                    engine.rate = Float(speed)
+                    controlBarView.setSpeed(Float(speed))
+                }
+
+                let eqPreset = UserDefaults.standard.integer(forKey: Defaults.defaultEQPreset)
+                if eqPreset > 0 { engine.setEqualizer(presetIndex: eqPreset) }
 
                 let autoPlay = UserDefaults.standard.bool(forKey: Defaults.autoPlayOnOpen)
                 if autoPlay {
@@ -340,19 +427,74 @@ class PlayerViewController: NSViewController {
             }
         }
 
-        // Auto-load matching subtitle files
+        // Resume playback from saved position
+        if UserDefaults.standard.bool(forKey: Defaults.resumePlayback),
+           let savedPos = ResumeManager.savedPosition(for: url), savedPos > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.playerEngine?.seekTo(time: savedPos)
+                self?.vlcEngine?.seekTo(time: savedPos)
+                self?.osdView.show(message: "Resumed from \(self?.formatSeekTime(savedPos) ?? "0:00")")
+            }
+        }
+
+        // Update Now Playing
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.nowPlayingController.updateNowPlaying(
+                title: url.deletingPathExtension().lastPathComponent,
+                duration: playerEngine?.duration ?? vlcEngine?.duration ?? 0
+            )
+        }
+
+        // Auto-load matching subtitle files, or extract embedded subtitles
         if UserDefaults.standard.bool(forKey: Defaults.autoLoadSubtitles) {
             let subs = SubtitleManager.findSubtitleFiles(for: url)
             if let first = subs.first {
                 subtitleManager.loadSubtitle(from: first)
+            } else if vlcEngine == nil {
+                // For AVPlayer files, try extracting embedded text subtitles
+                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                    let tracks = FFmpegBridge.subtitleTracks(forFile: url.path)
+                    guard let firstTrack = tracks.first,
+                          let index = firstTrack["index"] as? Int else { return }
+                    if let srtText = try? FFmpegBridge.extractSubtitleTrack(Int32(index), fromFile: url.path) {
+                        DispatchQueue.main.async {
+                            self?.subtitleManager.loadSubtitleFromSRTText(srtText)
+                            self?.osdView.show(message: "Embedded subtitles loaded")
+                        }
+                    }
+                }
             }
         }
 
-        // Evaluate passthrough in background
+        // Evaluate passthrough and update title bar badges
+        let isNative = url.isNativeAVPlayerFormat
         Task {
             let info = await MediaInfo.probe(url: url)
             await MainActor.run {
                 self.passthroughManager.evaluateForMedia(audioCodec: info.audioCodecName)
+
+                var codecName = info.videoCodec.rawValue
+                var isDV = info.isDolbyVision
+                var isHDR = info.hdrType != .sdr
+                var isAtmos = info.isDolbyAtmos
+
+                if !isNative || codecName == VideoCodec.unknown.rawValue {
+                    if let ffName = FFmpegBridge.videoCodecName(forFile: url.path) {
+                        codecName = ffName
+                    }
+                    let probe = FFmpegBridge.probeFile(url.path)
+                    if probe.hasDolbyVision.boolValue { isDV = true; isHDR = true }
+                    if probe.hasHDR.boolValue { isHDR = true }
+                }
+
+                if let wc = self.view.window?.windowController as? PlayerWindowController {
+                    wc.titleBarView.updateBadges(
+                        isDolbyVision: isDV,
+                        isHDR: isHDR,
+                        codecName: codecName,
+                        isAtmos: isAtmos
+                    )
+                }
             }
         }
     }
@@ -457,10 +599,13 @@ class PlayerViewController: NSViewController {
     }
 
     private func formatSeekTime(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds >= 0 else { return "00:00" }
-        let m = Int(seconds) / 60
-        let s = Int(seconds) % 60
-        return String(format: "%02d:%02d", m, s)
+        guard seconds.isFinite, seconds >= 0 else { return "0:00" }
+        let total = Int(seconds)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
+        return String(format: "%d:%02d", m, s)
     }
 
     func adjustVolume(by delta: Float) {
@@ -486,15 +631,17 @@ class PlayerViewController: NSViewController {
         }    }
 
     func adjustSpeed(by delta: Float) {
-        guard let engine = playerEngine else { return }
-        let newRate = max(0.25, min(4.0, engine.rate + delta))
-        engine.rate = newRate
-        controlBarView.setSpeed(newRate)
-        osdView.show(message: String(format: "Speed: %.2fx", newRate))
+        let currentRate: Float
+        if let engine = playerEngine { currentRate = engine.rate }
+        else if let engine = vlcEngine { currentRate = engine.rate }
+        else { return }
+        let newRate = max(0.25, min(4.0, currentRate + delta))
+        setSpeed(newRate)
     }
 
     func setSpeed(_ speed: Float) {
         playerEngine?.rate = speed
+        vlcEngine?.rate = speed
         controlBarView.setSpeed(speed)
         osdView.show(message: String(format: "Speed: %.2fx", speed))
     }
@@ -590,18 +737,18 @@ class PlayerViewController: NSViewController {
             }()
             guard let data = rep.representation(using: fileType, properties: [:]) else { return }
             let saveIndex = UserDefaults.standard.integer(forKey: Defaults.screenshotSavePath)
-            let dir: URL = {
+            let (dir, dirName): (URL, String) = {
                 switch saveIndex {
-                case 1: return FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!
-                case 2: return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-                default: return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+                case 1: return (FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!, "Pictures")
+                case 2: return (FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!, "Downloads")
+                default: return (FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!, "Desktop")
                 }
             }()
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
             let filename = "Awesome Player \(formatter.string(from: Date())).\(ext)"
             try? data.write(to: dir.appendingPathComponent(filename))
-            DispatchQueue.main.async { self?.osdView.show(message: "Screenshot saved to Desktop") }
+            DispatchQueue.main.async { self?.osdView.show(message: "Screenshot saved to \(dirName)") }
         }
     }
 
@@ -719,16 +866,66 @@ class PlayerViewController: NSViewController {
         }
     }
 
+    // MARK: - Frame Stepping
+
+    func stepFrame(forward: Bool) {
+        if let engine = playerEngine {
+            engine.stepFrame(forward: forward)
+            controlBarView.setPlaying(false)
+            osdView.show(message: forward ? "Frame ▶" : "◀ Frame")
+        }
+    }
+
+    // MARK: - Audio EQ
+
+    func applyEQPreset(_ index: Int) {
+        vlcEngine?.setEqualizer(presetIndex: index)
+    }
+
     // MARK: - Audio Sync
 
     func adjustAudioDelay(by delta: Double) {
         audioDelayOffset += delta
+        vlcEngine?.setAudioDelay(seconds: audioDelayOffset)
         osdView.show(message: String(format: "Audio delay: %+.1fs", audioDelayOffset))
     }
 
     func resetAudioDelay() {
         audioDelayOffset = 0
+        vlcEngine?.setAudioDelay(seconds: 0)
         osdView.show(message: "Audio delay reset")
+    }
+
+    // MARK: - Playlist Panel
+
+    func togglePlaylistPanel() {
+        if playlistPanel == nil {
+            let panel = PlaylistPanelView()
+            panel.delegate = self
+            panel.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(panel)
+
+            let trailing = panel.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+            playlistPanelConstraint = trailing
+            NSLayoutConstraint.activate([
+                trailing,
+                panel.topAnchor.constraint(equalTo: view.topAnchor),
+                panel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+                panel.widthAnchor.constraint(equalToConstant: 250),
+            ])
+            playlistPanel = panel
+        }
+
+        guard let panel = playlistPanel else { return }
+        panel.setItems(playlistManager.items)
+        panel.currentIndex = playlistManager.currentIndex
+
+        let showing = panel.isHidden
+        if showing {
+            panel.isHidden = false
+        } else {
+            panel.isHidden = true
+        }
     }
 
     // MARK: - Playlist
@@ -776,6 +973,7 @@ extension PlayerViewController: ControlBarDelegate {
 
     func controlBarVolumeChanged(to volume: Float) {
         playerEngine?.volume = volume
+        vlcEngine?.volume = volume
         osdView.show(message: "Volume: \(Int(volume * 100))%")
     }
 
@@ -784,11 +982,19 @@ extension PlayerViewController: ControlBarDelegate {
     }
 
     func controlBarSeekBackward() {
-        seek(by: -5)
+        seek(by: -shortSeek)
     }
 
     func controlBarSeekForward() {
-        seek(by: 5)
+        seek(by: shortSeek)
+    }
+
+    func controlBarPreviousClicked() {
+        playPreviousTrack()
+    }
+
+    func controlBarNextClicked() {
+        playNextTrack()
     }
 }
 
@@ -800,7 +1006,11 @@ extension PlayerViewController: AVPlayerEngineDelegate {
 
         if subtitleManager.hasSubtitles, subtitleManager.isVisible,
            let entry = subtitleManager.subtitle(at: current) {
-            subtitleOverlayView.setText(entry.text)
+            if let attr = entry.attributedText {
+                subtitleOverlayView.setAttributedText(attr)
+            } else {
+                subtitleOverlayView.setText(entry.text)
+            }
         } else {
             subtitleOverlayView.setText(nil)
         }
@@ -808,6 +1018,10 @@ extension PlayerViewController: AVPlayerEngineDelegate {
         if let player = playerEngine?.player {
             abLoopController.checkLoop(currentTime: player.currentTime())
         }
+
+        (NSApp.delegate as? AppDelegate)?.nowPlayingController.updateTime(
+            elapsed: current, rate: Double(playerEngine?.rate ?? 1.0)
+        )
     }
 
     func playerEngineDidFinishPlaying() {
@@ -831,6 +1045,7 @@ extension PlayerViewController: AVPlayerEngineDelegate {
     func playerEngineDidUpdateStatus(isPlaying: Bool) {
         controlBarView.setPlaying(isPlaying)
         onPlaybackStateChanged?(isPlaying)
+        (NSApp.delegate as? AppDelegate)?.nowPlayingController.updatePlaybackState(isPlaying: isPlaying)
     }
 
     func playerEngineExternalPlaybackChanged(isActive: Bool) {
@@ -863,6 +1078,17 @@ extension PlayerViewController: AVPlayerEngineDelegate {
 extension PlayerViewController: VLCPlayerEngineDelegate {
     func vlcEngineTimeDidChange(current: Double, duration: Double) {
         controlBarView.updateTime(current: current, duration: duration)
+
+        if subtitleManager.hasSubtitles, subtitleManager.isVisible,
+           let entry = subtitleManager.subtitle(at: current) {
+            if let attr = entry.attributedText {
+                subtitleOverlayView.setAttributedText(attr)
+            } else {
+                subtitleOverlayView.setText(entry.text)
+            }
+        } else if subtitleManager.isVisible {
+            subtitleOverlayView.setText(nil)
+        }
     }
     func vlcEngineDidFinishPlaying() {
         controlBarView.setPlaying(false)
@@ -886,6 +1112,22 @@ extension PlayerViewController: AudioPassthroughManagerDelegate {
 
     func togglePassthrough() {
         passthroughManager.toggle()
+    }
+}
+
+// MARK: - PlaylistPanelDelegate
+
+extension PlayerViewController: PlaylistPanelDelegate {
+    func playlistPanel(_ panel: PlaylistPanelView, didSelectItemAt index: Int) {
+        guard index < playlistManager.items.count else { return }
+        let url = playlistManager.items[index]
+        playlistManager.selectItem(at: index)
+        openFile(url: url)
+    }
+
+    func playlistPanel(_ panel: PlaylistPanelView, didRemoveItemAt index: Int) {
+        playlistManager.removeItem(at: index)
+        panel.setItems(playlistManager.items)
     }
 }
 

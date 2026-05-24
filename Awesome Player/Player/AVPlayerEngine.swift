@@ -62,6 +62,12 @@ class AVPlayerEngine: NSObject {
         }
     }
 
+    var useKeyframeSeeking = false
+
+    private var seekTolerance: CMTime {
+        useKeyframeSeeking ? .positiveInfinity : .zero
+    }
+
     var videoSize: NSSize? {
         guard let track = playerItem?.asset.tracks(withMediaType: .video).first else { return nil }
         // Apply preferredTransform to handle rotated videos (e.g. portrait iPhone footage)
@@ -136,9 +142,8 @@ class AVPlayerEngine: NSObject {
     func seek(by seconds: Double) {
         guard let player = player else { return }
         let current = player.currentTime()
-        // toleranceBefore/After: .zero for frame-accurate seeking (no snapping to keyframes)
         let target = CMTimeAdd(current, CMTimeMakeWithSeconds(seconds, preferredTimescale: 600))
-        player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.seek(to: target, toleranceBefore: seekTolerance, toleranceAfter: seekTolerance)
     }
 
     func seekToFraction(_ fraction: Double) {
@@ -146,12 +151,63 @@ class AVPlayerEngine: NSObject {
         let dur = item.duration.seconds
         guard dur.isFinite, dur > 0 else { return }
         let target = CMTimeMakeWithSeconds(dur * fraction, preferredTimescale: 600)
-        player?.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+        player?.seek(to: target, toleranceBefore: seekTolerance, toleranceAfter: seekTolerance)
     }
 
     func seekTo(time: Double) {
         let target = CMTimeMakeWithSeconds(time, preferredTimescale: 600)
-        player?.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+        player?.seek(to: target, toleranceBefore: seekTolerance, toleranceAfter: seekTolerance)
+    }
+
+    // MARK: - Track Switching
+
+    struct TrackInfo {
+        let index: Int
+        let name: String
+        let languageCode: String?
+    }
+
+    func getAudioTracks() -> [TrackInfo] {
+        guard let item = playerItem,
+              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .audible) else { return [] }
+        return group.options.enumerated().map { (i, option) in
+            let name = option.displayName
+            let lang = option.extendedLanguageTag
+            return TrackInfo(index: i, name: name, languageCode: lang)
+        }
+    }
+
+    func getSubtitleTracks() -> [TrackInfo] {
+        guard let item = playerItem,
+              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else { return [] }
+        return group.options.enumerated().map { (i, option) in
+            let name = option.displayName
+            let lang = option.extendedLanguageTag
+            return TrackInfo(index: i, name: name, languageCode: lang)
+        }
+    }
+
+    func selectAudioTrack(at index: Int) {
+        guard let item = playerItem,
+              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .audible),
+              index < group.options.count else { return }
+        item.select(group.options[index], in: group)
+    }
+
+    func selectSubtitleTrack(at index: Int) {
+        guard let item = playerItem,
+              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else { return }
+        if index < 0 {
+            item.select(nil, in: group)
+        } else if index < group.options.count {
+            item.select(group.options[index], in: group)
+        }
+    }
+
+    func stepFrame(forward: Bool) {
+        guard let item = playerItem else { return }
+        if isPlaying { pause() }
+        item.step(byCount: forward ? 1 : -1)
     }
 
     private func setupTimeObserver() {

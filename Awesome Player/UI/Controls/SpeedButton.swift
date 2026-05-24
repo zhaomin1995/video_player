@@ -40,7 +40,7 @@ class SpeedButton: NSView {
         let menu = NSMenu()
         for speed in speeds {
             let item = NSMenuItem(
-                title: String(format: "%.2gx", speed),
+                title: String(format: "%.3gx", speed),
                 action: #selector(speedSelected(_:)),
                 keyEquivalent: ""
             )
@@ -64,6 +64,6 @@ class SpeedButton: NSView {
 
     func setSpeed(_ speed: Float) {
         currentSpeed = speed
-        button.title = String(format: "%.2gx", speed)
+        button.title = String(format: "%.3gx", speed)
     }
 }

@@ -232,6 +232,164 @@ class ChromecastMenuDelegate: NSObject, NSMenuDelegate, NetServiceBrowserDelegat
     }
 }
 
+/// Populates Open Recent menu from a manually managed list in UserDefaults.
+class RecentDocumentsMenuDelegate: NSObject, NSMenuDelegate {
+    static let shared = RecentDocumentsMenuDelegate()
+    private static let key = "AwesomePlayer_RecentFiles"
+    private static let maxRecent = 10
+
+    static func addRecentFile(_ url: URL) {
+        var paths = UserDefaults.standard.stringArray(forKey: key) ?? []
+        paths.removeAll { $0 == url.path }
+        paths.insert(url.path, at: 0)
+        if paths.count > maxRecent { paths = Array(paths.prefix(maxRecent)) }
+        UserDefaults.standard.set(paths, forKey: key)
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let paths = UserDefaults.standard.stringArray(forKey: Self.key) ?? []
+        if paths.isEmpty {
+            let none = NSMenuItem(title: "(No Recent Files)", action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            menu.addItem(none)
+        } else {
+            for path in paths {
+                let url = URL(fileURLWithPath: path)
+                let item = menu.addItem(withTitle: url.lastPathComponent, action: #selector(openRecentFile(_:)), keyEquivalent: "")
+                item.representedObject = url
+                item.target = self
+            }
+        }
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Clear Menu", action: #selector(clearRecent(_:)), keyEquivalent: "")
+    }
+
+    @objc private func openRecentFile(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL,
+              let wc = NSApp.mainWindow?.windowController as? PlayerWindowController else { return }
+        wc.openFile(url: url)
+    }
+
+    @objc private func clearRecent(_ sender: NSMenuItem) {
+        UserDefaults.standard.removeObject(forKey: Self.key)
+    }
+}
+
+/// Dynamically populates audio/video/subtitle track menus when opened.
+/// Queries the active player engine for available tracks.
+class TrackMenuDelegate: NSObject, NSMenuDelegate {
+    enum TrackType { case audio, video, subtitle }
+    let trackType: TrackType
+
+    static let audio = TrackMenuDelegate(type: .audio)
+    static let video = TrackMenuDelegate(type: .video)
+    static let subtitle = TrackMenuDelegate(type: .subtitle)
+
+    init(type: TrackType) {
+        self.trackType = type
+        super.init()
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        guard let wc = NSApp.mainWindow?.windowController as? PlayerWindowController else {
+            addNoneItem(to: menu)
+            return
+        }
+        let vc = wc.playerViewController
+
+        if let vlc = vc.vlcEngine {
+            populateVLCTracks(menu: menu, vlc: vlc, vc: vc)
+        } else if let avEngine = vc.playerEngine {
+            populateAVTracks(menu: menu, engine: avEngine, vc: vc)
+        } else {
+            addNoneItem(to: menu)
+        }
+    }
+
+    private func populateVLCTracks(menu: NSMenu, vlc: VLCPlayerEngine, vc: PlayerViewController) {
+        let tracks: [VLCPlayerEngine.TrackInfo]
+        let currentId: Int
+
+        switch trackType {
+        case .audio:
+            tracks = vlc.getAudioTracks()
+            currentId = vlc.getCurrentAudioTrack()
+        case .subtitle:
+            tracks = vlc.getSubtitleTracks()
+            currentId = vlc.getCurrentSubtitleTrack()
+        case .video:
+            tracks = vlc.getVideoTracks()
+            currentId = -1
+        }
+
+        if tracks.isEmpty {
+            addNoneItem(to: menu)
+            return
+        }
+
+        for track in tracks {
+            let item = menu.addItem(withTitle: track.name, action: #selector(trackSelected(_:)), keyEquivalent: "")
+            item.tag = track.id
+            item.target = self
+            if track.id == currentId { item.state = .on }
+        }
+    }
+
+    private func populateAVTracks(menu: NSMenu, engine: AVPlayerEngine, vc: PlayerViewController) {
+        switch trackType {
+        case .audio:
+            let tracks = engine.getAudioTracks()
+            if tracks.isEmpty { addNoneItem(to: menu); return }
+            for track in tracks {
+                let item = menu.addItem(withTitle: track.name, action: #selector(trackSelected(_:)), keyEquivalent: "")
+                item.tag = track.index
+                item.target = self
+            }
+        case .subtitle:
+            let tracks = engine.getSubtitleTracks()
+            let off = menu.addItem(withTitle: "Off", action: #selector(trackSelected(_:)), keyEquivalent: "")
+            off.tag = -1
+            off.target = self
+            for track in tracks {
+                let item = menu.addItem(withTitle: track.name, action: #selector(trackSelected(_:)), keyEquivalent: "")
+                item.tag = track.index
+                item.target = self
+            }
+        case .video:
+            addNoneItem(to: menu)
+        }
+    }
+
+    @objc private func trackSelected(_ sender: NSMenuItem) {
+        guard let wc = NSApp.mainWindow?.windowController as? PlayerWindowController else { return }
+        let vc = wc.playerViewController
+        let trackId = sender.tag
+
+        if let vlc = vc.vlcEngine {
+            switch trackType {
+            case .audio: vlc.setAudioTrack(trackId)
+            case .subtitle: vlc.setSubtitleTrack(trackId)
+            case .video: vlc.setVideoTrack(trackId)
+            }
+        } else if let engine = vc.playerEngine {
+            switch trackType {
+            case .audio: engine.selectAudioTrack(at: trackId)
+            case .subtitle: engine.selectSubtitleTrack(at: trackId)
+            case .video: break
+            }
+        }
+        vc.showOSD("Track: \(sender.title)")
+    }
+
+    private func addNoneItem(to menu: NSMenu) {
+        let item = NSMenuItem(title: "(None)", action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        menu.addItem(item)
+    }
+}
+
 class MenuManager {
     static func setupMainMenu() {
         let mainMenu = NSMenu()
@@ -284,7 +442,7 @@ class MenuManager {
 
         let recentItem = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
         let recentMenu = NSMenu(title: "Open Recent")
-        recentMenu.addItem(withTitle: "Clear Menu", action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
+        recentMenu.delegate = RecentDocumentsMenuDelegate.shared
         recentItem.submenu = recentMenu
         menu.addItem(recentItem)
 
@@ -335,13 +493,12 @@ class MenuManager {
         let menuItem = NSMenuItem(title: "Audio", action: nil, keyEquivalent: "")
         let menu = NSMenu(title: "Audio")
 
-        // Tracks section
-        let tracksHeader = NSMenuItem(title: "Tracks", action: nil, keyEquivalent: "")
-        tracksHeader.isEnabled = false
-        menu.addItem(tracksHeader)
-        let noTrack = NSMenuItem(title: "(None)", action: nil, keyEquivalent: "")
-        noTrack.isEnabled = false
-        menu.addItem(noTrack)
+        // Tracks section (dynamically populated)
+        let tracksItem = NSMenuItem(title: "Audio Track", action: nil, keyEquivalent: "")
+        let tracksSubmenu = NSMenu(title: "Audio Track")
+        tracksSubmenu.delegate = TrackMenuDelegate.audio
+        tracksItem.submenu = tracksSubmenu
+        menu.addItem(tracksItem)
         menu.addItem(.separator())
 
         // Equalizer submenu
@@ -387,13 +544,12 @@ class MenuManager {
         let menuItem = NSMenuItem(title: "Video", action: nil, keyEquivalent: "")
         let menu = NSMenu(title: "Video")
 
-        // Tracks section
-        let tracksHeader = NSMenuItem(title: "Tracks", action: nil, keyEquivalent: "")
-        tracksHeader.isEnabled = false
-        menu.addItem(tracksHeader)
-        let noTrack = NSMenuItem(title: "(None)", action: nil, keyEquivalent: "")
-        noTrack.isEnabled = false
-        menu.addItem(noTrack)
+        // Tracks section (dynamically populated)
+        let tracksItem = NSMenuItem(title: "Video Track", action: nil, keyEquivalent: "")
+        let tracksSubmenu = NSMenu(title: "Video Track")
+        tracksSubmenu.delegate = TrackMenuDelegate.video
+        tracksItem.submenu = tracksSubmenu
+        menu.addItem(tracksItem)
         menu.addItem(.separator())
 
         // Full Screen & PiP
@@ -453,13 +609,12 @@ class MenuManager {
         let menuItem = NSMenuItem(title: "Subtitle", action: nil, keyEquivalent: "")
         let menu = NSMenu(title: "Subtitle")
 
-        // Tracks section
-        let tracksHeader = NSMenuItem(title: "Tracks", action: nil, keyEquivalent: "")
-        tracksHeader.isEnabled = false
-        menu.addItem(tracksHeader)
-        let noTrack = NSMenuItem(title: "(None)", action: nil, keyEquivalent: "")
-        noTrack.isEnabled = false
-        menu.addItem(noTrack)
+        // Tracks section (dynamically populated)
+        let tracksItem = NSMenuItem(title: "Subtitle Track", action: nil, keyEquivalent: "")
+        let tracksSubmenu = NSMenu(title: "Subtitle Track")
+        tracksSubmenu.delegate = TrackMenuDelegate.subtitle
+        tracksItem.submenu = tracksSubmenu
+        menu.addItem(tracksItem)
         menu.addItem(.separator())
 
         // Display Type submenu
@@ -497,6 +652,9 @@ class MenuManager {
         let menuItem = NSMenuItem(title: "Playlist", action: nil, keyEquivalent: "")
         let menu = NSMenu(title: "Playlist")
 
+        let showPlaylist = menu.addItem(withTitle: "Show Playlist", action: #selector(AppDelegate.togglePlaylistPanel(_:)), keyEquivalent: "p")
+        showPlaylist.keyEquivalentModifierMask = [.command, .shift]
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Repeat Off", action: #selector(AppDelegate.setRepeatOff(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "Repeat One", action: #selector(AppDelegate.setRepeatOne(_:)), keyEquivalent: "")
         menu.addItem(withTitle: "Repeat All", action: #selector(AppDelegate.setRepeatAll(_:)), keyEquivalent: "")
