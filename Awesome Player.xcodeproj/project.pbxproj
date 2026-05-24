@@ -403,7 +403,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nfor dylib in libavformat libavcodec libavutil libswresample libswscale; do\n    SRC=$(find \"${PROJECT_DIR}/Vendor/ffmpeg/lib\" -name \"${dylib}.*.*.*.dylib\" -not -type l | head -1)\n    [ -n \"$SRC\" ] && cp -f \"$SRC\" \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/\"\ndone\n";
+			shellScript = "# Copy FFmpeg dylibs\nmkdir -p \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nfor dylib in libavformat libavcodec libavutil libswresample libswscale; do\n    SRC=$(find \"${PROJECT_DIR}/Vendor/ffmpeg/lib\" -name \"${dylib}.*.*.*.dylib\" -not -type l | head -1)\n    [ -n \"$SRC\" ] && cp -f \"$SRC\" \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/\"\ndone\n\n# Copy libvlc dylibs\nmkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/lib\"\ncp -f \"${PROJECT_DIR}/Vendor/libvlc/lib/\"*.dylib \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/lib/\" 2>/dev/null || true\n\n# Copy VLC plugins\nif [ -d \"${PROJECT_DIR}/Vendor/libvlc/plugins\" ]; then\n    mkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/plugins\"\n    cp -Rf \"${PROJECT_DIR}/Vendor/libvlc/plugins/\"* \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/plugins/\" 2>/dev/null || true\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
