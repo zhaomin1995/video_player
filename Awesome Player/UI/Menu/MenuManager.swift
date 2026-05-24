@@ -589,10 +589,31 @@ class MenuManager {
         menu.addItem(withTitle: "Revert Transform", action: #selector(AppDelegate.revertTransform(_:)), keyEquivalent: "")
         menu.addItem(.separator())
 
+        // Crop submenu
+        let cropItem = NSMenuItem(title: "Crop", action: nil, keyEquivalent: "")
+        let cropMenu = NSMenu(title: "Crop")
+        for crop in ["Default", "16:9", "4:3", "16:10", "1.85:1", "2.35:1"] {
+            cropMenu.addItem(withTitle: crop, action: #selector(AppDelegate.setCrop(_:)), keyEquivalent: "")
+        }
+        cropItem.submenu = cropMenu
+        menu.addItem(cropItem)
+        menu.addItem(.separator())
+
         // Filters submenu
         let filtersItem = NSMenuItem(title: "Filters", action: nil, keyEquivalent: "")
         let filtersMenu = NSMenu(title: "Filters")
         filtersMenu.addItem(withTitle: "Video Equalizer…", action: #selector(AppDelegate.showVideoEQ(_:)), keyEquivalent: "e")
+
+        // Deinterlace submenu inside Filters
+        let deinterlaceItem = NSMenuItem(title: "Deinterlace", action: nil, keyEquivalent: "")
+        let deinterlaceMenu = NSMenu(title: "Deinterlace")
+        for mode in ["Off", "Blend", "Bob", "Linear", "Yadif"] {
+            let item = deinterlaceMenu.addItem(withTitle: mode, action: #selector(AppDelegate.setDeinterlace(_:)), keyEquivalent: "")
+            if mode == "Off" { item.state = .on }
+        }
+        deinterlaceItem.submenu = deinterlaceMenu
+        filtersMenu.addItem(deinterlaceItem)
+
         filtersItem.submenu = filtersMenu
         menu.addItem(filtersItem)
         menu.addItem(.separator())
@@ -703,6 +724,8 @@ class MenuManager {
         menu.addItem(withTitle: "Zoom", action: #selector(NSWindow.zoom(_:)), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Keep on Top", action: #selector(AppDelegate.toggleAlwaysOnTop(_:)), keyEquivalent: "t")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Media Inspector", action: #selector(AppDelegate.showInspector(_:)), keyEquivalent: "i")
 
         NSApplication.shared.windowsMenu = menu
         menuItem.submenu = menu

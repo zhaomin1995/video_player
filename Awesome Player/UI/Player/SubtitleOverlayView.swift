@@ -50,6 +50,31 @@ class SubtitleOverlayView: NSView {
             label.topAnchor.constraint(equalTo: topAnchor),
             label.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
+
+        // Observe subtitle preference changes for live updates
+        for key in [Defaults.subtitleFont, Defaults.subtitleFontSize, Defaults.subtitleColor] {
+            UserDefaults.standard.addObserver(self, forKeyPath: key, options: .new, context: nil)
+        }
+    }
+
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        refreshAppearance()
+    }
+
+    func refreshAppearance() {
+        let fontSize = CGFloat(UserDefaults.standard.double(forKey: Defaults.subtitleFontSize))
+        let fontIndex = UserDefaults.standard.integer(forKey: Defaults.subtitleFont)
+        let fontNames = ["", "HelveticaNeue", "Arial", "SFProText-Regular", "PingFangSC-Regular"]
+        if fontIndex > 0 && fontIndex < fontNames.count,
+           let font = NSFont(name: fontNames[fontIndex], size: fontSize > 0 ? fontSize : 24) {
+            label.font = font
+        } else {
+            label.font = .systemFont(ofSize: fontSize > 0 ? fontSize : 24, weight: .medium)
+        }
+
+        let colorIndex = UserDefaults.standard.integer(forKey: Defaults.subtitleColor)
+        let colors: [NSColor] = [.white, .yellow, .green, .cyan]
+        label.textColor = colorIndex < colors.count ? colors[colorIndex] : .white
     }
 
     func setText(_ text: String?) {

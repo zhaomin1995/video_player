@@ -45,6 +45,8 @@
 		A10060 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10060 /* main.swift */; };
 		A10070 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10070 /* WelcomeView.swift */; };
 		E55EEC072FC230F3000EE159 /* AudioPassthroughManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55EEC062FC230F3000EE159 /* AudioPassthroughManager.swift */; };
+		A10081 /* VideoEQPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10081 /* VideoEQPanelController.swift */; };
+		A10082 /* MediaInspectorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10082 /* MediaInspectorController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -89,6 +91,8 @@
 		F10050 /* AwesomePlayer-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "AwesomePlayer-Bridging-Header.h"; sourceTree = "<group>"; };
 		F10060 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		F10070 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		F10081 /* VideoEQPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoEQPanelController.swift; sourceTree = "<group>"; };
+		F10082 /* MediaInspectorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaInspectorController.swift; sourceTree = "<group>"; };
 		F10099 /* Awesome Player.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Awesome Player.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -212,6 +216,8 @@
 				F10028 /* VideoView.swift */,
 				F10070 /* WelcomeView.swift */,
 				D6342BFA0000000000000001 /* PlaylistPanelView.swift */,
+				F10081 /* VideoEQPanelController.swift */,
+				F10082 /* MediaInspectorController.swift */,
 			);
 			path = Player;
 			sourceTree = "<group>";
@@ -406,6 +412,8 @@
 				A10048 /* FFmpegBridge.m in Sources */,
 				A10060 /* main.swift in Sources */,
 				A10070 /* WelcomeView.swift in Sources */,
+				A10081 /* VideoEQPanelController.swift in Sources */,
+				A10082 /* MediaInspectorController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

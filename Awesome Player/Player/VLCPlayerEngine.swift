@@ -334,6 +334,17 @@ class VLCPlayerEngine {
         }
     }
 
+    // MARK: - Crop
+
+    func setCropGeometry(_ geometry: String?) {
+        guard let p = player else { return }
+        if let g = geometry {
+            libvlc_video_set_crop_geometry(p, g)
+        } else {
+            libvlc_video_set_crop_geometry(p, nil)
+        }
+    }
+
     private func startTimeUpdates() {
         timeUpdateTimer?.invalidate()
         timeUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in

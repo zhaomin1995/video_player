@@ -192,6 +192,23 @@ class PlayerViewController: NSViewController {
         let doubleClick = NSClickGestureRecognizer(target: self, action: #selector(handleDoubleClick))
         doubleClick.numberOfClicksRequired = 2
         view.addGestureRecognizer(doubleClick)
+
+        let pinch = NSMagnificationGestureRecognizer(target: self, action: #selector(handlePinch))
+        view.addGestureRecognizer(pinch)
+    }
+
+    @objc private func handlePinch(_ gesture: NSMagnificationGestureRecognizer) {
+        let action = UserDefaults.standard.integer(forKey: Defaults.pinchGestureAction)
+        guard action != 2, gesture.state == .ended else { return } // 2 = nothing
+        if gesture.magnification > 0.3 {
+            if !(view.window?.styleMask.contains(.fullScreen) ?? false) {
+                onDoubleClick?() // Enter fullscreen
+            }
+        } else if gesture.magnification < -0.3 {
+            if view.window?.styleMask.contains(.fullScreen) ?? false {
+                onDoubleClick?() // Exit fullscreen
+            }
+        }
     }
 
     private func registerForDraggedTypes() {
@@ -287,6 +304,18 @@ class PlayerViewController: NSViewController {
             stepFrame(forward: true)
         case (",", []):
             stepFrame(forward: false)
+        case (String(Character(UnicodeScalar(27))), []): // Escape
+            let behavior = UserDefaults.standard.integer(forKey: Defaults.escapeKeyBehavior)
+            switch behavior {
+            case 0: // Exit fullscreen
+                if view.window?.styleMask.contains(.fullScreen) ?? false { onDoubleClick?() }
+            case 1: // Close panel
+                if playlistPanel?.isHidden == false { togglePlaylistPanel() }
+            case 2: // Stop playback
+                playerEngine?.stop(); vlcEngine?.stop()
+                welcomeView.isHidden = false; controlBarView.setVideoActive(false)
+            default: break
+            }
         default:
             super.keyDown(with: event)
         }
@@ -343,7 +372,7 @@ class PlayerViewController: NSViewController {
 
     // MARK: - Playback
 
-    private func saveCurrentPosition() {
+    func saveCurrentPosition() {
         guard let url = currentFileURL else { return }
         let current = playerEngine?.currentTime ?? vlcEngine?.currentTime ?? 0
         let dur = playerEngine?.duration ?? vlcEngine?.duration ?? 0
@@ -609,11 +638,12 @@ class PlayerViewController: NSViewController {
     }
 
     func adjustVolume(by delta: Float) {
+        let maxVol: Float = UserDefaults.standard.bool(forKey: Defaults.extendedVolume) ? 2.0 : 1.0
         var v: Float = 1
         if let engine = playerEngine {
-            v = max(0, min(1, engine.volume + delta)); engine.volume = v
+            v = max(0, min(maxVol, engine.volume + delta)); engine.volume = v
         } else if let engine = vlcEngine {
-            v = max(0, min(1, engine.volume + delta)); engine.volume = v
+            v = max(0, min(maxVol, engine.volume + delta)); engine.volume = v
         }
         controlBarView.setVolume(v)
         osdView.show(message: "Volume: \(Int(v * 100))%")
@@ -711,6 +741,27 @@ class PlayerViewController: NSViewController {
     // MARK: - Screenshot
 
     func saveScreenshot() {
+        // VLC screenshot fallback
+        if playerEngine == nil, let vlc = vlcEngine {
+            let saveIndex = UserDefaults.standard.integer(forKey: Defaults.screenshotSavePath)
+            let dir: URL = {
+                switch saveIndex {
+                case 1: return FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!
+                case 2: return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+                default: return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+                }
+            }()
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+            let filename = "Awesome Player \(formatter.string(from: Date())).png"
+            let path = dir.appendingPathComponent(filename).path
+            if vlc.takeSnapshot(path: path) {
+                osdView.show(message: "Screenshot saved")
+            } else {
+                osdView.show(message: "Screenshot failed")
+            }
+            return
+        }
         guard let player = playerEngine?.player, let item = player.currentItem else {
             osdView.show(message: "No video playing")
             return
@@ -756,9 +807,8 @@ class PlayerViewController: NSViewController {
 
     func seekToAbsoluteTime(_ seconds: Double) {
         playerEngine?.seekTo(time: seconds)
-        let mins = Int(seconds) / 60
-        let secs = Int(seconds) % 60
-        osdView.show(message: String(format: "Jump to %d:%02d", mins, secs))
+        vlcEngine?.seekTo(time: seconds)
+        osdView.show(message: "Jump to \(formatSeekTime(seconds))")
     }
 
     func toggleABLoop() {
@@ -1028,10 +1078,13 @@ extension PlayerViewController: AVPlayerEngineDelegate {
         controlBarView.setPlaying(false)
         let action = UserDefaults.standard.integer(forKey: Defaults.mediaEndAction)
         switch action {
+        case 0: // Nothing
+            (NSApp.delegate as? AppDelegate)?.nowPlayingController.clear()
         case 1: // Close Media
             playerEngine?.stop()
             welcomeView.isHidden = false
             controlBarView.setVideoActive(false)
+            (NSApp.delegate as? AppDelegate)?.nowPlayingController.clear()
         case 2: // Play Next
             playNextTrack()
         case 3: // Loop
@@ -1089,13 +1142,35 @@ extension PlayerViewController: VLCPlayerEngineDelegate {
         } else if subtitleManager.isVisible {
             subtitleOverlayView.setText(nil)
         }
+
+        (NSApp.delegate as? AppDelegate)?.nowPlayingController.updateTime(
+            elapsed: current, rate: Double(vlcEngine?.rate ?? 1.0)
+        )
     }
     func vlcEngineDidFinishPlaying() {
         controlBarView.setPlaying(false)
+        (NSApp.delegate as? AppDelegate)?.nowPlayingController.updatePlaybackState(isPlaying: false)
+        let action = UserDefaults.standard.integer(forKey: Defaults.mediaEndAction)
+        switch action {
+        case 1: // Close Media
+            vlcEngine?.stop()
+            welcomeView.isHidden = false
+            controlBarView.setVideoActive(false)
+            (NSApp.delegate as? AppDelegate)?.nowPlayingController.clear()
+        case 2: // Play Next
+            playNextTrack()
+        case 3: // Loop
+            vlcEngine?.seekTo(time: 0)
+            vlcEngine?.play()
+            controlBarView.setPlaying(true)
+        default:
+            (NSApp.delegate as? AppDelegate)?.nowPlayingController.clear()
+        }
     }
     func vlcEngineDidUpdateStatus(isPlaying: Bool) {
         controlBarView.setPlaying(isPlaying)
         onPlaybackStateChanged?(isPlaying)
+        (NSApp.delegate as? AppDelegate)?.nowPlayingController.updatePlaybackState(isPlaying: isPlaying)
     }
 }
 

@@ -42,6 +42,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        windowController?.playerViewController.saveCurrentPosition()
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         UserDefaults.standard.bool(forKey: Defaults.quitOnLastWindowClosed)
     }
@@ -288,8 +292,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.playerViewController.toggleFillScreen()
     }
 
+    private var videoEQController: VideoEQPanelController?
+
     @objc func showVideoEQ(_ sender: Any?) {
-        windowController?.playerViewController.showOSD("Video equalizer")
+        if videoEQController == nil {
+            videoEQController = VideoEQPanelController()
+        }
+        videoEQController?.playerViewController = windowController?.playerViewController
+        videoEQController?.showWindow(nil)
+        videoEQController?.window?.makeKeyAndOrderFront(nil)
     }
 
     @objc func togglePiP(_ sender: Any?) {
@@ -316,6 +327,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.playerViewController.revertVideoTransform()
     }
 
+    @objc func setDeinterlace(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem, let menu = item.menu else { return }
+        for mi in menu.items { mi.state = .off }
+        item.state = .on
+        let mode = item.title == "Off" ? nil : item.title.lowercased()
+        windowController?.playerViewController.vlcEngine?.setDeinterlace(mode: mode)
+        windowController?.playerViewController.showOSD("Deinterlace: \(item.title)")
+    }
+
+    @objc func setCrop(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem, let menu = item.menu else { return }
+        for mi in menu.items { mi.state = .off }
+        item.state = .on
+        let geometry = item.title == "Default" ? nil : item.title
+        windowController?.playerViewController.vlcEngine?.setCropGeometry(geometry)
+        windowController?.playerViewController.showOSD("Crop: \(item.title)")
+    }
+
     // MARK: - Subtitle Menu
 
     @objc func toggleSubtitles(_ sender: Any?) {
@@ -326,6 +355,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let item = sender as? NSMenuItem, let menu = item.menu else { return }
         for mi in menu.items { mi.state = .off }
         item.state = .on
+        windowController?.playerViewController.updateSubtitlePosition()
         windowController?.playerViewController.showOSD("Subtitle: \(item.title)")
     }
 
@@ -437,6 +467,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Window Menu
+
+    private var inspectorController: MediaInspectorController?
+
+    @objc func showInspector(_ sender: Any?) {
+        if inspectorController == nil {
+            inspectorController = MediaInspectorController()
+        }
+        if let url = windowController?.playerViewController.currentFileURL {
+            inspectorController?.updateInfo(for: url)
+        }
+        inspectorController?.showWindow(nil)
+        inspectorController?.window?.makeKeyAndOrderFront(nil)
+    }
 
     @objc func toggleAlwaysOnTop(_ sender: Any?) {
         (windowController?.window as? PlayerWindow)?.toggleAlwaysOnTop()
