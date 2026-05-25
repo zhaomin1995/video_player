@@ -53,9 +53,12 @@ class AVPlayerEngine: NSObject {
         set { player?.isMuted = newValue }
     }
 
+    private var desiredRate: Float = 1.0
+
     var rate: Float {
-        get { player?.rate ?? 1.0 }
+        get { desiredRate }
         set {
+            desiredRate = newValue
             if isPlaying {
                 player?.rate = newValue
             }
@@ -65,7 +68,7 @@ class AVPlayerEngine: NSObject {
     var useKeyframeSeeking = false
 
     private var seekTolerance: CMTime {
-        useKeyframeSeeking ? .positiveInfinity : .zero
+        useKeyframeSeeking ? .positiveInfinity : CMTimeMakeWithSeconds(0.1, preferredTimescale: 600)
     }
 
     var videoSize: NSSize? {
@@ -77,6 +80,7 @@ class AVPlayerEngine: NSObject {
 
     func open(url: URL) {
         stop()
+        cachedDuration = 0
 
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
@@ -112,7 +116,7 @@ class AVPlayerEngine: NSObject {
     }
 
     func play() {
-        player?.play()
+        player?.rate = desiredRate
         print("[AVPlayerEngine] play() called, rate=\(player?.rate ?? 0), volume=\(player?.volume ?? 0), status=\(playerItem?.status.rawValue ?? -1)")
         delegate?.playerEngineDidUpdateStatus(isPlaying: true)
     }
@@ -139,11 +143,14 @@ class AVPlayerEngine: NSObject {
         NotificationCenter.default.removeObserver(self)
     }
 
+    private var isSeeking = false
+    private var pendingSeekTarget: CMTime?
+
     func seek(by seconds: Double) {
         guard let player = player else { return }
         let current = player.currentTime()
         let target = CMTimeAdd(current, CMTimeMakeWithSeconds(seconds, preferredTimescale: 600))
-        player.seek(to: target, toleranceBefore: seekTolerance, toleranceAfter: seekTolerance)
+        smoothSeek(to: target)
     }
 
     func seekToFraction(_ fraction: Double) {
@@ -151,12 +158,33 @@ class AVPlayerEngine: NSObject {
         let dur = item.duration.seconds
         guard dur.isFinite, dur > 0 else { return }
         let target = CMTimeMakeWithSeconds(dur * fraction, preferredTimescale: 600)
-        player?.seek(to: target, toleranceBefore: seekTolerance, toleranceAfter: seekTolerance)
+        smoothSeek(to: target)
     }
 
     func seekTo(time: Double) {
         let target = CMTimeMakeWithSeconds(time, preferredTimescale: 600)
-        player?.seek(to: target, toleranceBefore: seekTolerance, toleranceAfter: seekTolerance)
+        smoothSeek(to: target)
+    }
+
+    /// Coalesces rapid seeks so only the latest target is honored,
+    /// preventing a queue of slow exact-frame decodes from piling up.
+    private func smoothSeek(to target: CMTime) {
+        guard let player = player else { return }
+        if isSeeking {
+            pendingSeekTarget = target
+            return
+        }
+        isSeeking = true
+        player.seek(to: target, toleranceBefore: seekTolerance, toleranceAfter: seekTolerance) { [weak self] _ in
+            guard let self = self else { return }
+            if let pending = self.pendingSeekTarget {
+                self.pendingSeekTarget = nil
+                self.isSeeking = false
+                self.smoothSeek(to: pending)
+            } else {
+                self.isSeeking = false
+            }
+        }
     }
 
     // MARK: - Track Switching

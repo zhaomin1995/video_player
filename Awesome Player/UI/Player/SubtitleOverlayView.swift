@@ -57,6 +57,12 @@ class SubtitleOverlayView: NSView {
         }
     }
 
+    deinit {
+        for key in [Defaults.subtitleFont, Defaults.subtitleFontSize, Defaults.subtitleColor] {
+            UserDefaults.standard.removeObserver(self, forKeyPath: key)
+        }
+    }
+
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         refreshAppearance()
     }
@@ -95,10 +101,6 @@ class SubtitleOverlayView: NSView {
             label.stringValue = ""
             isHidden = true
         }
-    }
-
-    func setBitmapImage(_ image: NSImage?) {
-        // Bitmap subtitle support — will use NSImageView in Phase 10
     }
 
     override func draw(_ dirtyRect: NSRect) {

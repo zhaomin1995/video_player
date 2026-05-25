@@ -59,10 +59,6 @@ class SubtitleManager {
         !entries.isEmpty
     }
 
-    var entryCount: Int {
-        entries.count
-    }
-
     static func findSubtitleFiles(for videoURL: URL) -> [URL] {
         let directory = videoURL.deletingLastPathComponent()
         let videoName = videoURL.deletingPathExtension().lastPathComponent

@@ -26,6 +26,7 @@ protocol CastingManagerDelegate: AnyObject {
     func castingManager(_ manager: CastingManager, didRemoveDevice deviceId: String)
     func castingManager(_ manager: CastingManager, didChangeState state: CastState)
     func castingManager(_ manager: CastingManager, didUpdatePosition position: Double, duration: Double)
+    func castingManager(_ manager: CastingManager, didFail message: String)
 }
 
 class CastingManager {
@@ -33,6 +34,7 @@ class CastingManager {
 
     private let chromecastManager = ChromecastManager()
     private let dlnaManager = DLNAManager()
+    let airplayManager = AirPlayCastManager()
     private let httpServer = CastingHTTPServer()
 
     private(set) var state: CastState = .disconnected
@@ -41,13 +43,21 @@ class CastingManager {
     func startDiscovery() {
         chromecastManager.delegate = self
         dlnaManager.delegate = self
+        airplayManager.delegate = self
         chromecastManager.startDiscovery()
         dlnaManager.startDiscovery()
+        airplayManager.startDiscovery()
     }
 
     func stopDiscovery() {
         chromecastManager.stopDiscovery()
         dlnaManager.stopDiscovery()
+        airplayManager.stopDiscovery()
+    }
+
+    func startAirPlayDiscovery() {
+        airplayManager.delegate = self
+        airplayManager.startDiscovery()
     }
 
     func connect(to device: CastDevice) {
@@ -60,30 +70,35 @@ class CastingManager {
         case .dlna:
             dlnaManager.connect(to: device)
         case .airplay:
-            break // Handled by AVPlayer natively
+            break
         }
     }
 
     func cast(fileURL: URL, to device: CastDevice) {
-        castLog("[CastingManager] Starting HTTP server for: \(fileURL.path)")
-        httpServer.start(servingFile: fileURL) { [weak self] serverURL in
-            guard let self = self, let url = serverURL else {
-                castLog("[CastingManager] HTTP server failed to start")
-                return
-            }
-            castLog("[CastingManager] HTTP server ready at: \(url.absoluteString)")
+        switch device.type {
+        case .airplay:
+            airplayManager.cast(fileURL: fileURL, httpServer: httpServer, to: device)
+        default:
+            castLog("[CastingManager] Starting HTTP server for: \(fileURL.path)")
+            httpServer.start(servingFile: fileURL) { [weak self] serverURL in
+                guard let self = self, let url = serverURL else {
+                    castLog("[CastingManager] HTTP server failed to start")
+                    return
+                }
+                castLog("[CastingManager] HTTP server ready at: \(url.absoluteString)")
 
-            switch device.type {
-            case .chromecast:
-                self.chromecastManager.loadMedia(url: url, on: device)
-            case .dlna:
-                self.dlnaManager.loadMedia(url: url, on: device)
-            case .airplay:
-                break
-            }
+                switch device.type {
+                case .chromecast:
+                    self.chromecastManager.loadMedia(url: url, on: device)
+                case .dlna:
+                    self.dlnaManager.loadMedia(url: url, on: device)
+                case .airplay:
+                    break
+                }
 
-            self.state = .playing(device)
-            self.delegate?.castingManager(self, didChangeState: self.state)
+                self.state = .playing(device)
+                self.delegate?.castingManager(self, didChangeState: self.state)
+            }
         }
     }
 
@@ -93,7 +108,7 @@ class CastingManager {
             switch device.type {
             case .chromecast: chromecastManager.pause()
             case .dlna: dlnaManager.pause()
-            case .airplay: break
+            case .airplay: airplayManager.pause()
             }
         default: break
         }
@@ -105,7 +120,7 @@ class CastingManager {
             switch device.type {
             case .chromecast: chromecastManager.play()
             case .dlna: dlnaManager.play()
-            case .airplay: break
+            case .airplay: airplayManager.play()
             }
         default: break
         }
@@ -117,7 +132,7 @@ class CastingManager {
             switch device.type {
             case .chromecast: chromecastManager.seek(to: position)
             case .dlna: dlnaManager.seek(to: position)
-            case .airplay: break
+            case .airplay: airplayManager.seek(to: position)
             }
         default: break
         }
@@ -129,7 +144,7 @@ class CastingManager {
             switch device.type {
             case .chromecast: chromecastManager.stop()
             case .dlna: dlnaManager.stop()
-            case .airplay: break
+            case .airplay: airplayManager.stop()
             }
         default: break
         }
@@ -183,5 +198,35 @@ extension CastingManager: DLNAManagerDelegate {
 
     func dlnaDidUpdatePosition(_ position: Double, duration: Double) {
         delegate?.castingManager(self, didUpdatePosition: position, duration: duration)
+    }
+}
+
+extension CastingManager: AirPlayCastManagerDelegate {
+    func airplayCastDidDiscover(_ device: CastDevice) {
+        discoveredDevices.append(device)
+        delegate?.castingManager(self, didDiscoverDevice: device)
+    }
+
+    func airplayCastDidRemove(_ deviceId: String) {
+        discoveredDevices.removeAll { $0.id == deviceId }
+        delegate?.castingManager(self, didRemoveDevice: deviceId)
+    }
+
+    func airplayCastDidConnect(_ device: CastDevice) {
+        state = .connected(device)
+        castLog("[CastingManager] AirPlay connected: \(device.name)")
+        delegate?.castingManager(self, didChangeState: state)
+    }
+
+    func airplayCastDidStartPlaying() {
+        if case .connected(let device) = state {
+            state = .playing(device)
+            delegate?.castingManager(self, didChangeState: state)
+        }
+    }
+
+    func airplayCastDidFail(_ message: String) {
+        castLog("[CastingManager] AirPlay failed: \(message)")
+        delegate?.castingManager(self, didFail: message)
     }
 }

@@ -67,6 +67,17 @@ class VideoEQPanelController: NSWindowController {
         case "gamma": vlc.setGamma(value)
         default: break
         }
+        updateValueLabel(for: sender)
+    }
+
+    private func updateValueLabel(for slider: NSSlider) {
+        guard let row = slider.superview as? NSStackView else { return }
+        for sub in row.arrangedSubviews {
+            if let label = sub as? NSTextField, label.tag == slider.identifier?.rawValue.hashValue ?? 0 {
+                label.stringValue = String(format: "%.1f", slider.doubleValue)
+                break
+            }
+        }
     }
 
     @objc private func resetAll() {
@@ -86,6 +97,7 @@ class VideoEQPanelController: NSWindowController {
                         case "gamma": slider.doubleValue = 1
                         default: break
                         }
+                        updateValueLabel(for: slider)
                     }
                 }
             }

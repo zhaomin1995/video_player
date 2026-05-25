@@ -80,11 +80,6 @@ class AudioPassthroughManager {
         }
     }
 
-    /// Re-evaluate when the user changes the preference mode
-    func modeChanged() {
-        evaluateForMedia(audioCodec: currentAudioCodec)
-    }
-
     // MARK: - Codec Detection
 
     private func isEncodedCodec(_ codec: String?) -> Bool {
@@ -276,7 +271,7 @@ class AudioPassthroughManager {
         if mode == .auto || mode == .alwaysOn {
             if !isDeviceCapable && wasActive {
                 deactivate()
-            } else if isDeviceCapable && !wasActive && isEncodedCodec(currentAudioCodec) {
+            } else if isDeviceCapable && !wasActive && (mode == .alwaysOn || isEncodedCodec(currentAudioCodec)) {
                 activate()
             }
         }

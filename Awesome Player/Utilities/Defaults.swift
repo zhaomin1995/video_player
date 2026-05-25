@@ -44,7 +44,6 @@ enum Defaults {
     static let defaultSaturation = "video.defaultSaturation"
 
     // MARK: - Audio
-    static let defaultOutputDevice = "audio.defaultOutputDevice"
     static let defaultVolume = "audio.defaultVolume"
     static let extendedVolume = "audio.extendedVolume"
     static let passthroughMode = "audio.passthroughMode" // "auto", "on", "off"

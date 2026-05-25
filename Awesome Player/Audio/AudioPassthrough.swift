@@ -126,7 +126,4 @@ class AudioPassthrough {
         )
     }
 
-    static func isPassthroughAvailable() -> Bool {
-        !queryOutputDevices().isEmpty
-    }
 }

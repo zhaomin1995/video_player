@@ -1,5 +1,4 @@
 import AVFoundation
-import CoreMedia
 
 enum ABLoopState {
     case inactive
@@ -21,19 +20,6 @@ class ABLoopController {
     var isActive: Bool {
         if case .active = state { return true }
         return false
-    }
-
-    var pointA: CMTime? {
-        switch state {
-        case .settingA(let a): return a
-        case .active(let a, _): return a
-        default: return nil
-        }
-    }
-
-    var pointB: CMTime? {
-        if case .active(_, let b) = state { return b }
-        return nil
     }
 
     func toggle(currentTime: CMTime) {
@@ -67,22 +53,6 @@ class ABLoopController {
                 delegate?.abLoopShouldSeek(to: a)
             }
         }
-    }
-
-    func setPointA(_ time: CMTime) {
-        switch state {
-        case .active(_, let b):
-            state = .active(a: time, b: b)
-        default:
-            state = .settingA(time)
-        }
-        delegate?.abLoopStateChanged(state)
-    }
-
-    func setPointB(_ time: CMTime) {
-        guard case .settingA(let a) = state else { return }
-        state = .active(a: a, b: time)
-        delegate?.abLoopStateChanged(state)
     }
 
     func clear() {

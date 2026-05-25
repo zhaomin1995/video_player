@@ -38,30 +38,11 @@ class PlaylistManager {
         items.append(url)
     }
 
-    func addItems(_ urls: [URL]) {
-        items.append(contentsOf: urls)
-    }
-
     func removeItem(at index: Int) {
         guard index >= 0, index < items.count else { return }
         items.remove(at: index)
         if currentIndex >= items.count {
             currentIndex = items.count - 1
-        }
-    }
-
-    func moveItem(from source: Int, to destination: Int) {
-        guard source >= 0, source < items.count,
-              destination >= 0, destination < items.count else { return }
-        let item = items.remove(at: source)
-        items.insert(item, at: destination)
-
-        if currentIndex == source {
-            currentIndex = destination
-        } else if source < currentIndex && destination >= currentIndex {
-            currentIndex -= 1
-        } else if source > currentIndex && destination <= currentIndex {
-            currentIndex += 1
         }
     }
 
@@ -114,8 +95,4 @@ class PlaylistManager {
         return currentItem
     }
 
-    func clear() {
-        items.removeAll()
-        currentIndex = -1
-    }
 }

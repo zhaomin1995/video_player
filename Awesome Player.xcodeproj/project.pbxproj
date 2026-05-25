@@ -39,6 +39,7 @@
 		A10035 /* CastingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10036 /* CastingManager.swift */; };
 		A10036 /* ChromecastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10037 /* ChromecastManager.swift */; };
 		A10037 /* DLNAManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10038 /* DLNAManager.swift */; };
+		A10038 /* AirPlayCastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10039 /* AirPlayCastManager.swift */; };
 		A10047 /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10047 /* PreferencesWindowController.swift */; };
 		A10048 /* FFmpegBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = F10048 /* FFmpegBridge.m */; };
 		A10060 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10060 /* main.swift */; };
@@ -84,6 +85,7 @@
 		F10036 /* CastingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingManager.swift; sourceTree = "<group>"; };
 		F10037 /* ChromecastManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromecastManager.swift; sourceTree = "<group>"; };
 		F10038 /* DLNAManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DLNAManager.swift; sourceTree = "<group>"; };
+		F10039 /* AirPlayCastManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayCastManager.swift; sourceTree = "<group>"; };
 		F10047 /* PreferencesWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
 		F10048 /* FFmpegBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FFmpegBridge.m; sourceTree = "<group>"; };
 		F10049 /* FFmpegBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FFmpegBridge.h; sourceTree = "<group>"; };
@@ -168,6 +170,7 @@
 				F10036 /* CastingManager.swift */,
 				F10037 /* ChromecastManager.swift */,
 				F10038 /* DLNAManager.swift */,
+				F10039 /* AirPlayCastManager.swift */,
 			);
 			path = Casting;
 			sourceTree = "<group>";
@@ -407,6 +410,7 @@
 				A10035 /* CastingManager.swift in Sources */,
 				A10036 /* ChromecastManager.swift in Sources */,
 				A10037 /* DLNAManager.swift in Sources */,
+				A10038 /* AirPlayCastManager.swift in Sources */,
 				A10047 /* PreferencesWindowController.swift in Sources */,
 				A10048 /* FFmpegBridge.m in Sources */,
 				A10060 /* main.swift in Sources */,

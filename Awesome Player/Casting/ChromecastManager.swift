@@ -483,12 +483,14 @@ class NWConnectionWrapper: NSObject, StreamDelegate {
             return
         }
         if canWrite {
-            data.withUnsafeBytes { ptr in
-                guard let base = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                let written = output.write(base, maxLength: data.count)
-                if written < 0 {
-                    castLog("[Chromecast] Send error: \(output.streamError?.localizedDescription ?? "unknown")")
-                }
+            let written = data.withUnsafeBytes { ptr -> Int in
+                guard let base = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+                return output.write(base, maxLength: data.count)
+            }
+            if written < 0 {
+                castLog("[Chromecast] Send error: \(output.streamError?.localizedDescription ?? "unknown")")
+            } else if written < data.count {
+                outputBuffer.append(data.subdata(in: written..<data.count))
             }
         } else {
             outputBuffer.append(data)
@@ -551,12 +553,12 @@ class NWConnectionWrapper: NSObject, StreamDelegate {
 
     private func flushOutputBuffer() {
         guard !outputBuffer.isEmpty, let output = outputStream else { return }
-        outputBuffer.withUnsafeBytes { ptr in
-            guard let base = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-            let written = output.write(base, maxLength: outputBuffer.count)
-            if written > 0 {
-                outputBuffer.removeFirst(written)
-            }
+        let written = outputBuffer.withUnsafeBytes { ptr -> Int in
+            guard let base = ptr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+            return output.write(base, maxLength: outputBuffer.count)
+        }
+        if written > 0 {
+            outputBuffer.removeFirst(written)
         }
     }
 }

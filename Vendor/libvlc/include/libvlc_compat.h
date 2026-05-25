@@ -12,6 +12,8 @@ extern "C" {
 typedef struct libvlc_instance_t libvlc_instance_t;
 typedef struct libvlc_media_t libvlc_media_t;
 typedef struct libvlc_media_player_t libvlc_media_player_t;
+typedef struct libvlc_renderer_discoverer_t libvlc_renderer_discoverer_t;
+typedef struct libvlc_renderer_item_t libvlc_renderer_item_t;
 
 typedef enum {
     libvlc_NothingSpecial = 0,
@@ -158,6 +160,8 @@ typedef struct libvlc_event_t {
         struct { libvlc_time_t new_time; } media_player_time_changed;
         struct { libvlc_time_t new_length; } media_player_length_changed;
         struct { int new_count; } media_player_vout;
+        struct { libvlc_renderer_item_t *item; } renderer_discoverer_item_added;
+        struct { libvlc_renderer_item_t *item; } renderer_discoverer_item_deleted;
     } u;
 } libvlc_event_t;
 
@@ -169,6 +173,8 @@ enum {
     libvlc_MediaPlayerPositionChanged = 0x100 + 12,
     libvlc_MediaPlayerLengthChanged = 0x100 + 17,
     libvlc_MediaPlayerEndReached    = 0x100 + 9,
+    libvlc_RendererDiscovererItemAdded   = 0x502,
+    libvlc_RendererDiscovererItemDeleted = 0x503,
 };
 
 typedef void (*libvlc_callback_t)(const libvlc_event_t *, void *);
@@ -186,6 +192,28 @@ void libvlc_media_player_set_chapter(libvlc_media_player_t *p_mi, int i_chapter)
 
 // Audio filters (via media options)
 void libvlc_media_add_option(libvlc_media_t *p_md, const char *psz_options);
+
+// Renderer discoverer
+typedef struct libvlc_rd_description_t {
+    char *psz_name;
+    char *psz_longname;
+} libvlc_rd_description_t;
+
+libvlc_renderer_item_t *libvlc_renderer_item_hold(libvlc_renderer_item_t *p_item);
+void libvlc_renderer_item_release(libvlc_renderer_item_t *p_item);
+const char *libvlc_renderer_item_name(const libvlc_renderer_item_t *p_item);
+const char *libvlc_renderer_item_type(const libvlc_renderer_item_t *p_item);
+int libvlc_renderer_item_flags(const libvlc_renderer_item_t *p_item);
+
+libvlc_renderer_discoverer_t *libvlc_renderer_discoverer_new(libvlc_instance_t *p_inst, const char *psz_name);
+void libvlc_renderer_discoverer_release(libvlc_renderer_discoverer_t *p_rd);
+int libvlc_renderer_discoverer_start(libvlc_renderer_discoverer_t *p_rd);
+void libvlc_renderer_discoverer_stop(libvlc_renderer_discoverer_t *p_rd);
+libvlc_event_manager_t *libvlc_renderer_discoverer_event_manager(libvlc_renderer_discoverer_t *p_rd);
+size_t libvlc_renderer_discoverer_list_get(libvlc_instance_t *p_inst, libvlc_rd_description_t ***ppp_services);
+void libvlc_renderer_discoverer_list_release(libvlc_rd_description_t **pp_services, size_t i_count);
+
+int libvlc_media_player_set_renderer(libvlc_media_player_t *p_mi, libvlc_renderer_item_t *p_item);
 
 // External subtitle/audio slave
 typedef enum libvlc_media_slave_type_t {

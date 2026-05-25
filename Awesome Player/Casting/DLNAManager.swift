@@ -146,12 +146,12 @@ class DLNAManager {
         let params = NWParameters.udp
         let connection = NWConnection(host: group, port: port, using: params)
 
-        connection.stateUpdateHandler = { state in
+        connection.stateUpdateHandler = { [weak self] state in
             if case .ready = state {
                 let data = searchMessage.data(using: .utf8)!
                 connection.send(content: data, completion: .contentProcessed { _ in })
 
-                self.receiveSSDP(connection: connection)
+                self?.receiveSSDP(connection: connection)
             }
         }
 

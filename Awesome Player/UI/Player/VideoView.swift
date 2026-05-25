@@ -3,17 +3,32 @@ import AVFoundation
 
 class VideoView: NSView {
     private var playerLayer: AVPlayerLayer?
+    var onFileDropped: ((URL) -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.cgColor
+        registerForDraggedTypes([.fileURL])
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.cgColor
+        registerForDraggedTypes([.fileURL])
+    }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) else { return [] }
+        return .copy
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+              let url = urls.first else { return false }
+        onFileDropped?(url)
+        return true
     }
 
     func setPlayer(_ player: AVPlayer?) {
@@ -59,12 +74,9 @@ class VideoView: NSView {
         let target = layer ?? playerLayer
         let mode = UserDefaults.standard.integer(forKey: Defaults.hdrToneMappingMode)
         switch mode {
-        case 1: // Always HDR — enable EDR
-            target?.wantsExtendedDynamicRangeContent = true
-        case 2: // Force SDR — disable EDR
-            target?.wantsExtendedDynamicRangeContent = false
-        default: // System — let macOS decide
-            target?.wantsExtendedDynamicRangeContent = true
+        case 1: target?.wantsExtendedDynamicRangeContent = true
+        case 2: target?.wantsExtendedDynamicRangeContent = false
+        default: target?.wantsExtendedDynamicRangeContent = true
         }
     }
 }

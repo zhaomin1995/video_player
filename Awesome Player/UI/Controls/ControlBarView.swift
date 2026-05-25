@@ -14,6 +14,7 @@ protocol ControlBarDelegate: AnyObject {
     func controlBarSeekForward()
     func controlBarPreviousClicked()
     func controlBarNextClicked()
+    func controlBarAirPlayRequested()
 }
 
 class ControlBarView: NSView {
@@ -103,6 +104,10 @@ class ControlBarView: NSView {
         effectView.addSubview(fullscreenButton)
 
         castButton.translatesAutoresizingMaskIntoConstraints = false
+        castButton.isHidden = true
+        castButton.onAirPlayFallback = { [weak self] in
+            self?.delegate?.controlBarAirPlayRequested()
+        }
         effectView.addSubview(castButton)
 
         setupConstraints()
@@ -168,6 +173,7 @@ class ControlBarView: NSView {
         } else {
             effectView.layer?.backgroundColor = NSColor.clear.cgColor
         }
+        castButton.isHidden = !active
     }
 
     // MARK: - Public API
@@ -180,6 +186,9 @@ class ControlBarView: NSView {
         currentTimeLabel.stringValue = formatTime(current)
         durationLabel.stringValue = " / \(formatTime(duration))"
         if duration > 0 {
+            if seekSlider.duration <= 0 {
+                seekSlider.duration = duration
+            }
             seekSlider.setProgress(current / duration)
         }
     }
@@ -215,6 +224,10 @@ class ControlBarView: NSView {
 
     func setSeekBarAsset(_ asset: AVAsset?) {
         seekSlider.currentAsset = asset
+    }
+
+    func castButtonFrameInWindow() -> NSRect {
+        castButton.convert(castButton.bounds, to: nil)
     }
 
     private func formatTime(_ seconds: Double) -> String {

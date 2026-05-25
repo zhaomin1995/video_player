@@ -179,17 +179,6 @@ struct MediaInfo {
             }
         }
 
-        // Check color primaries and transfer function for DV indicators
-        if let colorPrimaries = extensions[kCMFormatDescriptionExtension_ColorPrimaries as String] as? String {
-            if colorPrimaries == "ITU_R_2020" {
-                if let transfer = extensions[kCMFormatDescriptionExtension_TransferFunction as String] as? String {
-                    if transfer.contains("SMPTE_ST_2084") || transfer.contains("ITU_R_2100_HLG") {
-                        // Could be HDR10 or DV — need DV config box to confirm
-                    }
-                }
-            }
-        }
-
         return false
     }
 

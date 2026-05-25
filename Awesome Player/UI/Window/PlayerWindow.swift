@@ -4,8 +4,7 @@
 import Cocoa
 
 class PlayerWindow: NSWindow {
-    private var initialMouseLocation: NSPoint = .zero
-    private var isMovingWindow = false
+    var onFileDropped: ((URL) -> Void)?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -26,47 +25,28 @@ class PlayerWindow: NSWindow {
             defer: false
         )
 
-        // Disable window state restoration so macOS doesn't override our size
         isRestorable = false
         titlebarAppearsTransparent = UserDefaults.standard.bool(forKey: Defaults.transparentTitleBar)
         titleVisibility = .hidden
-        // Disabled so drag-to-seek on the video area doesn't accidentally move the window
         isMovableByWindowBackground = false
         backgroundColor = .black
-        // 480x270 = 16:9 minimum to prevent the control bar from being clipped
         minSize = NSSize(width: 480, height: 270)
         collectionBehavior = [.fullScreenPrimary]
-        // Required for mouseMoved events (used to show/hide controls on hover)
         acceptsMouseMovedEvents = true
         tabbingMode = .disallowed
         registerForDraggedTypes([.fileURL])
     }
 
-    var onFileDropped: ((URL) -> Void)?
-
-    func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+    func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) else { return [] }
         return .copy
     }
 
-    func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
               let url = urls.first else { return false }
         onFileDropped?(url)
         return true
-    }
-
-    /// Intentionally a no-op: locking contentAspectRatio prevents free resizing.
-    /// AVPlayerLayer's .resizeAspect gravity handles letterboxing automatically.
-    func setAspectRatio(_ ratio: NSSize) {
-    }
-
-    func clearAspectRatio() {
-        contentResizeIncrements = NSSize(width: 1, height: 1)
-    }
-
-    override func performDrag(with event: NSEvent) {
-        // Allow window dragging from video area
     }
 
     func toggleAlwaysOnTop() {

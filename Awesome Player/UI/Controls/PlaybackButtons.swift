@@ -13,8 +13,6 @@ class PlaybackButtons: NSView {
     private let seekForwardButton = NSButton()
     private let nextButton = NSButton()
 
-    private var isPlaying = false
-
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setupViews()
@@ -67,7 +65,6 @@ class PlaybackButtons: NSView {
     }
 
     func setPlaying(_ playing: Bool) {
-        isPlaying = playing
         let symbol = playing ? "pause.fill" : "play.fill"
         playPauseButton.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
     }

@@ -24,3 +24,4 @@ Vendor/ffmpeg/lib/pkgconfig/
 *.ipa
 *.dSYM.zip
 *.dSYM
+.claude/settings.local.json

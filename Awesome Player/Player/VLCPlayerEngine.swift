@@ -13,9 +13,19 @@ class VLCPlayerEngine {
     weak var delegate: VLCPlayerEngineDelegate?
 
     private static var sharedVLCInstance: OpaquePointer? = {
-        let pluginPath = Bundle.main.bundlePath + "/Contents/plugins"
-        let args: [String] = ["--no-video-title-show", "--no-stats", "--no-snapshot-preview", "--vout=macosx"]
+        // Use VLC.app's plugin directory if available (pre-built cache, faster startup)
+        let vlcAppPlugins = "/Applications/VLC.app/Contents/MacOS/plugins"
+        let bundledPlugins = Bundle.main.bundlePath + "/Contents/plugins"
+        let pluginPath = FileManager.default.fileExists(atPath: vlcAppPlugins) ? vlcAppPlugins : bundledPlugins
+        let args: [String] = [
+            "--no-video-title-show", "--no-stats", "--no-snapshot-preview",
+            "--vout=caopengllayer",
+            "--sout-chromecast-conversion-quality=2",
+        ]
         setenv("VLC_PLUGIN_PATH", pluginPath, 1)
+        if FileManager.default.fileExists(atPath: "/Applications/VLC.app/Contents/MacOS/lib") {
+            setenv("DYLD_LIBRARY_PATH", "/Applications/VLC.app/Contents/MacOS/lib", 1)
+        }
         var cStrings = args.map { strdup($0) }
         defer { cStrings.forEach { free($0) } }
         var ptrs = cStrings.map { UnsafePointer<CChar>($0) as UnsafePointer<CChar>? }
@@ -26,8 +36,13 @@ class VLCPlayerEngine {
         return inst
     }()
 
+    /// Force VLC plugin loading now so file opens are instant.
+    static func preload() {
+        _ = sharedVLCInstance
+    }
+
     private var instance: OpaquePointer?
-    private var player: OpaquePointer?
+    private(set) var player: OpaquePointer?
     private var media: OpaquePointer?
     private var eventManager: OpaquePointer?
 
@@ -144,17 +159,35 @@ class VLCPlayerEngine {
     }
 
     func seek(by seconds: Double) {
-        seekTo(time: max(0, min(duration, currentTime + seconds)))
+        let target = currentTime + seconds
+        if duration > 0 {
+            seekTo(time: max(0, min(duration, target)))
+        } else {
+            seekTo(time: max(0, target))
+        }
     }
 
     func seekTo(time: Double) {
         guard let p = player else { return }
+        restartIfEnded()
         libvlc_media_player_set_time(p, Int64(time * 1000))
     }
 
     func seekToFraction(_ fraction: Double) {
         guard let p = player else { return }
+        restartIfEnded()
         libvlc_media_player_set_position(p, Float(fraction))
+    }
+
+    private func restartIfEnded() {
+        guard let p = player else { return }
+        let state = libvlc_media_player_get_state(p)
+        if state == libvlc_Ended || state == libvlc_Stopped {
+            libvlc_media_player_stop(p)
+            libvlc_media_player_play(p)
+            isPlaying = true
+            delegate?.vlcEngineDidUpdateStatus(isPlaying: true)
+        }
     }
 
     func stop() {
@@ -184,12 +217,15 @@ class VLCPlayerEngine {
 
     // MARK: - Event-Driven Updates
 
+    private var eventContext: Unmanaged<VLCPlayerEngine>?
+
     private func attachEvents() {
         guard let p = player else { return }
         eventManager = libvlc_media_player_event_manager(p)
         guard let em = eventManager else { return }
 
-        let ctx = Unmanaged.passUnretained(self).toOpaque()
+        eventContext = Unmanaged.passRetained(self)
+        let ctx = eventContext!.toOpaque()
 
         libvlc_event_attach(em, Int32(libvlc_MediaPlayerTimeChanged), vlcTimeChanged, ctx)
         libvlc_event_attach(em, Int32(libvlc_MediaPlayerLengthChanged), vlcLengthChanged, ctx)
@@ -200,22 +236,22 @@ class VLCPlayerEngine {
     }
 
     private func detachEvents() {
-        guard let em = eventManager else { return }
-        let ctx = Unmanaged.passUnretained(self).toOpaque()
+        guard let em = eventManager, let ctx = eventContext else { return }
+        let ptr = ctx.toOpaque()
 
-        libvlc_event_detach(em, Int32(libvlc_MediaPlayerTimeChanged), vlcTimeChanged, ctx)
-        libvlc_event_detach(em, Int32(libvlc_MediaPlayerLengthChanged), vlcLengthChanged, ctx)
-        libvlc_event_detach(em, Int32(libvlc_MediaPlayerEndReached), vlcEndReached, ctx)
-        libvlc_event_detach(em, Int32(libvlc_MediaPlayerPlaying), vlcPlaying, ctx)
-        libvlc_event_detach(em, Int32(libvlc_MediaPlayerPaused), vlcPaused, ctx)
-        libvlc_event_detach(em, Int32(libvlc_MediaPlayerStopped), vlcStopped, ctx)
+        libvlc_event_detach(em, Int32(libvlc_MediaPlayerTimeChanged), vlcTimeChanged, ptr)
+        libvlc_event_detach(em, Int32(libvlc_MediaPlayerLengthChanged), vlcLengthChanged, ptr)
+        libvlc_event_detach(em, Int32(libvlc_MediaPlayerEndReached), vlcEndReached, ptr)
+        libvlc_event_detach(em, Int32(libvlc_MediaPlayerPlaying), vlcPlaying, ptr)
+        libvlc_event_detach(em, Int32(libvlc_MediaPlayerPaused), vlcPaused, ptr)
+        libvlc_event_detach(em, Int32(libvlc_MediaPlayerStopped), vlcStopped, ptr)
+
+        ctx.release()
+        eventContext = nil
     }
 
     fileprivate func handleTimeChanged(_ timeMs: Int64) {
         let time = Double(timeMs) / 1000.0
-        guard let p = player else { return }
-        let len = Double(libvlc_media_player_get_length(p)) / 1000.0
-        if len > 0 { duration = len }
         delegate?.vlcEngineTimeDidChange(current: time, duration: duration)
     }
 
@@ -344,10 +380,6 @@ class VLCPlayerEngine {
         libvlc_audio_set_delay(p, Int64(seconds * 1_000_000))
     }
 
-    func getAudioDelay() -> Double {
-        guard let p = player else { return 0 }
-        return Double(libvlc_audio_get_delay(p)) / 1_000_000
-    }
 
     // MARK: - Snapshot
 
@@ -415,22 +447,111 @@ class VLCPlayerEngine {
         }
     }
 
-    // MARK: - Chapters
+    // MARK: - Renderer Discovery & Output
 
-    func getChapterCount() -> Int {
-        guard let p = player else { return 0 }
-        return Int(libvlc_media_player_get_chapter_count(p))
+    struct RendererInfo {
+        let name: String
+        let type: String
+        let item: OpaquePointer // libvlc_renderer_item_t*
     }
 
-    func getCurrentChapter() -> Int {
-        guard let p = player else { return -1 }
-        return Int(libvlc_media_player_get_chapter(p))
+    private var rendererDiscoverers: [OpaquePointer] = []
+    private var rendererEventContexts: [Unmanaged<VLCPlayerEngine>] = []
+    private(set) var discoveredRenderers: [RendererInfo] = []
+    var onRendererDiscovered: (() -> Void)?
+
+    func startRendererDiscovery() {
+        stopRendererDiscovery()
+        guard let inst = instance else { return }
+
+        var descs: UnsafeMutablePointer<UnsafeMutablePointer<libvlc_rd_description_t>?>?
+        let count = libvlc_renderer_discoverer_list_get(inst, &descs)
+        guard count > 0, let list = descs else { return }
+
+        for i in 0..<count {
+            guard let desc = list[i],
+                  let cName = desc.pointee.psz_name else { continue }
+            let name = String(cString: cName)
+            guard let rd = libvlc_renderer_discoverer_new(inst, name) else { continue }
+
+            let em = libvlc_renderer_discoverer_event_manager(rd)
+            let ctx = Unmanaged.passRetained(self)
+            rendererEventContexts.append(ctx)
+            let ptr = ctx.toOpaque()
+
+            libvlc_event_attach(em, Int32(libvlc_RendererDiscovererItemAdded), vlcRendererAdded, ptr)
+            libvlc_event_attach(em, Int32(libvlc_RendererDiscovererItemDeleted), vlcRendererRemoved, ptr)
+
+            if libvlc_renderer_discoverer_start(rd) == 0 {
+                rendererDiscoverers.append(rd)
+            } else {
+                libvlc_renderer_discoverer_release(rd)
+                ctx.release()
+                rendererEventContexts.removeLast()
+            }
+        }
+        libvlc_renderer_discoverer_list_release(descs, count)
     }
 
-    func setChapter(_ index: Int) {
+    func stopRendererDiscovery() {
+        for rd in rendererDiscoverers {
+            libvlc_renderer_discoverer_stop(rd)
+            libvlc_renderer_discoverer_release(rd)
+        }
+        rendererDiscoverers.removeAll()
+        for ctx in rendererEventContexts {
+            ctx.release()
+        }
+        rendererEventContexts.removeAll()
+        for r in discoveredRenderers {
+            libvlc_renderer_item_release(r.item)
+        }
+        discoveredRenderers.removeAll()
+    }
+
+    func setRenderer(_ renderer: RendererInfo?) {
         guard let p = player else { return }
-        libvlc_media_player_set_chapter(p, Int32(index))
+        if let r = renderer {
+            libvlc_media_player_set_renderer(p, r.item)
+        } else {
+            libvlc_media_player_set_renderer(p, nil)
+        }
     }
+
+    fileprivate func handleRendererAdded(_ item: OpaquePointer) {
+        let held = libvlc_renderer_item_hold(item)!
+        let name = String(cString: libvlc_renderer_item_name(held))
+        let type = String(cString: libvlc_renderer_item_type(held))
+        let info = RendererInfo(name: name, type: type, item: held)
+        discoveredRenderers.append(info)
+        print("[VLCEngine] Renderer discovered: \(name) (\(type))")
+        onRendererDiscovered?()
+    }
+
+    fileprivate func handleRendererRemoved(_ item: OpaquePointer) {
+        discoveredRenderers.removeAll { r in
+            if r.item == item {
+                libvlc_renderer_item_release(r.item)
+                return true
+            }
+            return false
+        }
+        onRendererDiscovered?()
+    }
+}
+
+private func vlcRendererAdded(_ event: UnsafePointer<libvlc_event_t>?, _ userData: UnsafeMutableRawPointer?) {
+    guard let event = event, let userData = userData else { return }
+    let item = event.pointee.u.renderer_discoverer_item_added.item!
+    let engine = Unmanaged<VLCPlayerEngine>.fromOpaque(userData).takeUnretainedValue()
+    DispatchQueue.main.async { engine.handleRendererAdded(item) }
+}
+
+private func vlcRendererRemoved(_ event: UnsafePointer<libvlc_event_t>?, _ userData: UnsafeMutableRawPointer?) {
+    guard let event = event, let userData = userData else { return }
+    let item = event.pointee.u.renderer_discoverer_item_deleted.item!
+    let engine = Unmanaged<VLCPlayerEngine>.fromOpaque(userData).takeUnretainedValue()
+    DispatchQueue.main.async { engine.handleRendererRemoved(item) }
 }
 
 // MARK: - C Callbacks (must be free functions, not closures)

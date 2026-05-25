@@ -72,11 +72,18 @@ class CastingHTTPServer {
             return
         }
 
+        guard fileSize > 0 else {
+            sendErrorResponse(connection: connection, status: 404)
+            return
+        }
+
         // Parse Range header
         var rangeStart: UInt64 = 0
         var rangeEnd: UInt64 = fileSize - 1
+        var hasRangeHeader = false
 
         if let rangeLine = request.components(separatedBy: "\r\n").first(where: { $0.lowercased().hasPrefix("range:") }) {
+            hasRangeHeader = true
             let rangeValue = rangeLine.components(separatedBy: ":").dropFirst().joined(separator: ":").trimmingCharacters(in: .whitespaces)
             if rangeValue.hasPrefix("bytes=") {
                 let byteRange = rangeValue.dropFirst(6)
@@ -93,8 +100,8 @@ class CastingHTTPServer {
         let contentLength = rangeEnd - rangeStart + 1
         let mimeType = mimeTypeForExtension(fileURL.pathExtension)
 
-        let statusCode = rangeStart > 0 ? 206 : 200
-        let statusText = rangeStart > 0 ? "Partial Content" : "OK"
+        let statusCode = hasRangeHeader ? 206 : 200
+        let statusText = hasRangeHeader ? "Partial Content" : "OK"
 
         var headers = "HTTP/1.1 \(statusCode) \(statusText)\r\n"
         headers += "Content-Type: \(mimeType)\r\n"

@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowController: PlayerWindowController?
     private var preferencesController: PreferencesWindowController?
-    private let castingManager = CastingManager()
+    let castingManager = CastingManager()
     let nowPlayingController = NowPlayingController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -23,7 +23,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.activate(ignoringOtherApps: true)
 
-        // Watch for theme changes from preferences
+        castingManager.startAirPlayDiscovery()
+
         UserDefaults.standard.addObserver(self, forKeyPath: Defaults.theme, options: .new, context: nil)
     }
 
@@ -44,6 +45,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         windowController?.playerViewController.saveCurrentPosition()
+        UserDefaults.standard.removeObserver(self, forKeyPath: Defaults.theme)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -203,14 +205,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.playerViewController.toggleABLoop()
     }
 
-    @objc func nextChapter(_ sender: Any?) {
-        windowController?.playerViewController.seekToNextChapter()
-    }
-
-    @objc func previousChapter(_ sender: Any?) {
-        windowController?.playerViewController.seekToPreviousChapter()
-    }
-
     // MARK: - Audio Menu
 
     @objc func volumeUp(_ sender: Any?) {
@@ -222,14 +216,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func toggleMute(_ sender: Any?) {
         windowController?.playerViewController.toggleMute()
     }
-    @objc func showAudioPanel(_ sender: Any?) {
-        windowController?.playerViewController.showOSD("Audio panel")
-    }
-
-    @objc func togglePassthrough(_ sender: Any?) {
-        windowController?.playerViewController.togglePassthrough()
-    }
-
     @objc func setEQPreset(_ sender: Any?) {
         guard let item = sender as? NSMenuItem, let menu = item.menu else { return }
         for mi in menu.items { mi.state = .off }
@@ -414,18 +400,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Cast Menu
 
     @objc func showAirPlay(_ sender: Any?) {
-        // AVRoutePickerView on macOS only routes audio — for video, the user
-        // needs Screen Mirroring from Control Center or an external display.
-        // Trigger the picker for audio, then open Screen Mirroring if video
-        // doesn't activate.
-        windowController?.playerViewController.showAirPlayPicker()
-
-        // Also open the Displays settings so the user can add the TV as a display
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            guard let vc = self?.windowController?.playerViewController,
-                  !(vc.playerEngine?.player?.isExternalPlaybackActive ?? false) else { return }
-            vc.showOSD("Tip: Use Control Center > Screen Mirroring to show video on TV", duration: 5.0)
-        }
+        guard let vc = windowController?.playerViewController else { return }
+        vc.controlBarAirPlayRequested()
     }
 
     @objc func playOnExternalDisplay(_ sender: Any?) {
@@ -455,12 +431,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         castingManager.connect(to: castDevice)
         castingManager.cast(fileURL: castURL, to: castDevice)
         vc.showOSD("Casting to \(device.name)…", duration: 3.0)
-    }
-
-    @objc func showChromecast(_ sender: Any?) {
-        castingManager.delegate = self
-        castingManager.startDiscovery()
-        windowController?.playerViewController.showOSD("Searching for Chromecast devices…", duration: 3.0)
     }
 
     @objc func showDLNA(_ sender: Any?) {
@@ -583,5 +553,9 @@ extension AppDelegate: CastingManagerDelegate {
     }
 
     func castingManager(_ manager: CastingManager, didUpdatePosition position: Double, duration: Double) {
+    }
+
+    func castingManager(_ manager: CastingManager, didFail message: String) {
+        windowController?.playerViewController.showOSD(message, duration: 5.0)
     }
 }

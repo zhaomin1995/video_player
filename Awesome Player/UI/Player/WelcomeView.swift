@@ -6,6 +6,7 @@ import Cocoa
 class WelcomeView: NSView {
     private let iconView = NSView()
     private let playSymbol = NSImageView()
+    var onFileDropped: ((URL) -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -17,8 +18,21 @@ class WelcomeView: NSView {
         setupViews()
     }
 
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) else { return [] }
+        return .copy
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+              let url = urls.first else { return false }
+        onFileDropped?(url)
+        return true
+    }
+
     private func setupViews() {
         wantsLayer = true
+        registerForDraggedTypes([.fileURL])
         layer?.backgroundColor = NSColor(white: 0.18, alpha: 1).cgColor
 
         iconView.wantsLayer = true

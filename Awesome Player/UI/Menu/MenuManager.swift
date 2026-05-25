@@ -262,7 +262,8 @@ class RecentDocumentsMenuDelegate: NSObject, NSMenuDelegate {
             }
         }
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Clear Menu", action: #selector(clearRecent(_:)), keyEquivalent: "")
+        let clearItem = menu.addItem(withTitle: "Clear Menu", action: #selector(clearRecent(_:)), keyEquivalent: "")
+        clearItem.target = self
     }
 
     @objc private func openRecentFile(_ sender: NSMenuItem) {
@@ -618,10 +619,10 @@ class MenuManager {
         menu.addItem(.separator())
 
         // Size
-        let half = menu.addItem(withTitle: "Half Size", action: #selector(AppDelegate.setHalfSize(_:)), keyEquivalent: "`")
-        let actual = menu.addItem(withTitle: "Actual Size", action: #selector(AppDelegate.setOriginalSize(_:)), keyEquivalent: "1")
-        let double = menu.addItem(withTitle: "Double Size", action: #selector(AppDelegate.setDoubleSize(_:)), keyEquivalent: "2")
-        let fit = menu.addItem(withTitle: "Fit to Screen", action: #selector(AppDelegate.fitToScreen(_:)), keyEquivalent: "4")
+        menu.addItem(withTitle: "Half Size", action: #selector(AppDelegate.setHalfSize(_:)), keyEquivalent: "`")
+        menu.addItem(withTitle: "Actual Size", action: #selector(AppDelegate.setOriginalSize(_:)), keyEquivalent: "1")
+        menu.addItem(withTitle: "Double Size", action: #selector(AppDelegate.setDoubleSize(_:)), keyEquivalent: "2")
+        menu.addItem(withTitle: "Fit to Screen", action: #selector(AppDelegate.fitToScreen(_:)), keyEquivalent: "4")
         menu.addItem(.separator())
 
         // Fill Screen & Aspect Ratio

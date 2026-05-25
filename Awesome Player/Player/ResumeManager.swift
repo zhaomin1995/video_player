@@ -2,6 +2,7 @@ import Foundation
 
 class ResumeManager {
     private static let storageKey = "AwesomePlayer_ResumePositions"
+    private static let orderKey = "AwesomePlayer_ResumeOrder"
     private static let maxEntries = 100
 
     private static let minDuration: Double = 180
@@ -19,24 +20,29 @@ class ResumeManager {
         guard shouldStore(position: position, duration: duration) else { return }
 
         var dict = UserDefaults.standard.dictionary(forKey: storageKey) as? [String: Double] ?? [:]
-        dict[url.path] = position
+        var order = UserDefaults.standard.stringArray(forKey: orderKey) ?? []
 
-        // FIFO eviction if over limit
-        if dict.count > maxEntries {
-            let sorted = dict.sorted { $0.value < $1.value }
-            let toRemove = dict.count - maxEntries
-            for i in 0..<toRemove {
-                dict.removeValue(forKey: sorted[i].key)
-            }
+        dict[url.path] = position
+        order.removeAll { $0 == url.path }
+        order.append(url.path)
+
+        // FIFO eviction: remove oldest entries
+        while dict.count > maxEntries && !order.isEmpty {
+            let oldest = order.removeFirst()
+            dict.removeValue(forKey: oldest)
         }
 
         UserDefaults.standard.set(dict, forKey: storageKey)
+        UserDefaults.standard.set(order, forKey: orderKey)
     }
 
     static func clearPosition(for url: URL) {
         var dict = UserDefaults.standard.dictionary(forKey: storageKey) as? [String: Double] ?? [:]
+        var order = UserDefaults.standard.stringArray(forKey: orderKey) ?? []
         dict.removeValue(forKey: url.path)
+        order.removeAll { $0 == url.path }
         UserDefaults.standard.set(dict, forKey: storageKey)
+        UserDefaults.standard.set(order, forKey: orderKey)
     }
 
     private static func shouldStore(position: Double, duration: Double) -> Bool {

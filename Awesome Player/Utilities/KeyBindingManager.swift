@@ -19,29 +19,6 @@ enum PlayerAction: String, CaseIterable {
     case frameBackward = "frameBackward"
     case nextChapter = "nextChapter"
     case previousChapter = "previousChapter"
-
-    var displayName: String {
-        switch self {
-        case .playPause: return "Play / Pause"
-        case .seekForwardShort: return "Seek Forward (Short)"
-        case .seekBackwardShort: return "Seek Backward (Short)"
-        case .seekForwardLong: return "Seek Forward (Long)"
-        case .seekBackwardLong: return "Seek Backward (Long)"
-        case .seekForwardExtraLong: return "Seek Forward (Extra Long)"
-        case .seekBackwardExtraLong: return "Seek Backward (Extra Long)"
-        case .volumeUp: return "Volume Up"
-        case .volumeDown: return "Volume Down"
-        case .mute: return "Mute"
-        case .fullscreen: return "Toggle Fullscreen"
-        case .speedUp: return "Speed Up"
-        case .speedDown: return "Speed Down"
-        case .speedReset: return "Speed Reset"
-        case .frameForward: return "Frame Forward"
-        case .frameBackward: return "Frame Backward"
-        case .nextChapter: return "Next Chapter"
-        case .previousChapter: return "Previous Chapter"
-        }
-    }
 }
 
 struct KeyBinding: Codable {
@@ -90,23 +67,6 @@ class KeyBindingManager {
             }
         }
         return nil
-    }
-
-    func setBinding(action: PlayerAction, key: String, modifiers: NSEvent.ModifierFlags) {
-        bindings.removeAll { $0.action == action.rawValue }
-        let cleaned = modifiers.intersection(.deviceIndependentFlagsMask)
-            .subtracting([.numericPad, .function])
-        bindings.append(KeyBinding(key: key, modifiers: cleaned.rawValue, action: action.rawValue))
-        saveBindings()
-    }
-
-    func resetToDefaults() {
-        bindings = Self.defaultBindings
-        saveBindings()
-    }
-
-    func binding(for action: PlayerAction) -> KeyBinding? {
-        bindings.first { $0.action == action.rawValue }
     }
 
     private static let defaultBindings: [KeyBinding] = {

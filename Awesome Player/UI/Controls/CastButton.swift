@@ -3,8 +3,8 @@ import AVKit
 
 class CastButton: NSView {
     private var routePickerView: AVRoutePickerView?
-    private let fallbackButton = NSButton()
-    private var isAirPlayAvailable = true
+    private var overlay: ClickInterceptView?
+    var onAirPlayFallback: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -36,7 +36,6 @@ class CastButton: NSView {
     }
 
     func showPicker() {
-        // Programmatically trigger the AVRoutePickerView's internal button
         for subview in routePickerView?.subviews ?? [] {
             if let button = subview as? NSButton {
                 button.performClick(nil)
@@ -50,14 +49,28 @@ class CastButton: NSView {
     }
 
     func setEnabled(_ enabled: Bool) {
-        isAirPlayAvailable = enabled
-        routePickerView?.alphaValue = enabled ? 1.0 : 0.4
-        routePickerView?.isHidden = false
-
-        if !enabled {
-            toolTip = "AirPlay unavailable for this codec"
+        if enabled {
+            overlay?.removeFromSuperview()
+            overlay = nil
         } else {
-            toolTip = "AirPlay / Cast"
+            if overlay == nil {
+                let o = ClickInterceptView(frame: bounds)
+                o.autoresizingMask = [.width, .height]
+                o.onClicked = { [weak self] in
+                    self?.onAirPlayFallback?()
+                }
+                addSubview(o)
+                overlay = o
+            }
         }
+        toolTip = enabled ? "AirPlay / Cast" : "AirPlay"
+    }
+}
+
+private class ClickInterceptView: NSView {
+    var onClicked: (() -> Void)?
+
+    override func mouseDown(with event: NSEvent) {
+        onClicked?()
     }
 }

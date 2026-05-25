@@ -329,7 +329,7 @@ class FullScreenPrefsView: NSView {
 
 class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
     private let tableView = NSTableView()
-    private var shortcuts: [(action: String, key: String)] = [
+    private let shortcuts: [(action: String, key: String)] = [
         ("Play / Pause", "Space"),
         ("Seek ±5 seconds", "← / →"),
         ("Seek ±30 seconds", "⇧← / ⇧→"),
@@ -339,14 +339,13 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
         ("Toggle fullscreen", "F"),
         ("Speed -/+ 0.25x", "[ / ]"),
         ("Reset speed 1.0x", "\\"),
+        ("Frame step fwd / bwd", ". / ,"),
+        ("Next / prev chapter", "⌘N / ⌘P"),
         ("A-B loop", "R"),
         ("Open file", "⌘O"),
         ("Keep on top", "⌘T"),
         ("Save screenshot", "⌥⌘S"),
     ]
-    private var editingRow: Int? = nil
-    private var keyMonitor: Any?
-    private static let shortcutsKey = "AwesomePlayer_CustomShortcuts"
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -359,13 +358,7 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
         addSectionHeader(stack, "Escape Key")
         addPopupRow(stack, "Escape key action:", key: Defaults.escapeKeyBehavior, items: ["Exit Fullscreen", "Close Panel", "Stop Playback"])
 
-        loadShortcuts()
-
         addSectionHeader(stack, "Keyboard Shortcuts")
-        let hint = NSTextField(labelWithString: "Double-click a shortcut to change it")
-        hint.font = .systemFont(ofSize: 11)
-        hint.textColor = .tertiaryLabelColor
-        stack.addArrangedSubview(hint)
 
         let actionCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("action"))
         actionCol.title = "Action"
@@ -379,19 +372,13 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
         tableView.delegate = self
         tableView.rowHeight = 22
         tableView.usesAlternatingRowBackgroundColors = true
-        tableView.doubleAction = #selector(shortcutDoubleClicked)
-        tableView.target = self
 
         let scrollView = NSScrollView()
         scrollView.documentView = tableView
         scrollView.hasVerticalScroller = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.heightAnchor.constraint(equalToConstant: 200).isActive = true
+        scrollView.heightAnchor.constraint(equalToConstant: 220).isActive = true
         stack.addArrangedSubview(scrollView)
-
-        let resetBtn = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetShortcuts))
-        resetBtn.bezelStyle = .rounded
-        stack.addArrangedSubview(resetBtn)
 
         addSectionHeader(stack, "Mouse")
         addPopupRow(stack, "Single click:", key: Defaults.singleClickAction, items: ["Play / Pause", "Nothing"])
@@ -417,95 +404,13 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
         if tableColumn?.identifier.rawValue == "action" {
             text = shortcuts[row].action
         } else {
-            if editingRow == row {
-                text = "⌨ Press key…"
-            } else {
-                text = shortcuts[row].key
-            }
+            text = shortcuts[row].key
         }
         let label = NSTextField(labelWithString: text)
         label.font = tableColumn?.identifier.rawValue == "key"
             ? .monospacedSystemFont(ofSize: 12, weight: .medium)
             : .systemFont(ofSize: 12)
-        if editingRow == row && tableColumn?.identifier.rawValue == "key" {
-            label.textColor = .systemBlue
-        }
         return label
-    }
-
-    @objc private func shortcutDoubleClicked() {
-        let row = tableView.clickedRow
-        guard row >= 0 else { return }
-
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-            keyMonitor = nil
-        }
-
-        editingRow = row
-        tableView.reloadData()
-
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self = self, let editing = self.editingRow else { return event }
-            var parts: [String] = []
-            if event.modifierFlags.contains(.control) { parts.append("⌃") }
-            if event.modifierFlags.contains(.option) { parts.append("⌥") }
-            if event.modifierFlags.contains(.shift) { parts.append("⇧") }
-            if event.modifierFlags.contains(.command) { parts.append("⌘") }
-            let char = event.charactersIgnoringModifiers?.uppercased() ?? ""
-            parts.append(char)
-            self.shortcuts[editing].key = parts.joined()
-            self.editingRow = nil
-            self.tableView.reloadData()
-            self.saveShortcuts()
-
-            if let monitor = self.keyMonitor {
-                NSEvent.removeMonitor(monitor)
-                self.keyMonitor = nil
-            }
-            return nil
-        }
-    }
-
-    private func saveShortcuts() {
-        let data = shortcuts.map { ["action": $0.action, "key": $0.key] }
-        UserDefaults.standard.set(data, forKey: Self.shortcutsKey)
-    }
-
-    private func loadShortcuts() {
-        guard let data = UserDefaults.standard.array(forKey: Self.shortcutsKey) as? [[String: String]] else { return }
-        for (i, dict) in data.enumerated() {
-            if i < shortcuts.count, let key = dict["key"] {
-                shortcuts[i].key = key
-            }
-        }
-    }
-
-    @objc private func resetShortcuts() {
-        shortcuts = [
-            ("Play / Pause", "Space"),
-            ("Seek ±5 seconds", "← / →"),
-            ("Seek ±30 seconds", "⇧← / ⇧→"),
-            ("Seek ±60 seconds", "⌘← / ⌘→"),
-            ("Volume up / down", "↑ / ↓"),
-            ("Mute / Unmute", "M"),
-            ("Toggle fullscreen", "F"),
-            ("Speed -/+ 0.25x", "[ / ]"),
-            ("Reset speed 1.0x", "\\"),
-            ("A-B loop", "R"),
-            ("Open file", "⌘O"),
-            ("Keep on top", "⌘T"),
-            ("Save screenshot", "⌥⌘S"),
-        ]
-        editingRow = nil
-        tableView.reloadData()
-        UserDefaults.standard.removeObject(forKey: Self.shortcutsKey)
-    }
-
-    deinit {
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
     }
 }
 

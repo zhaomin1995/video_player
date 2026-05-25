@@ -16,20 +16,6 @@ typedef struct {
     BOOL hasHDR;
 } DVPMediaProbeResult;
 
-typedef struct {
-    int trackIndex;
-    char language[32];
-    char codecName[32];
-    int channels;
-    int sampleRate;
-} DVPAudioTrackInfo;
-
-typedef struct {
-    int trackIndex;
-    char language[32];
-    char codecName[32];
-} DVPSubtitleTrackInfo;
-
 @interface FFmpegBridge : NSObject
 
 + (void)initialize;
@@ -42,11 +28,6 @@ typedef struct {
 + (BOOL)remuxFile:(NSString *)inputPath
        toOutput:(NSString *)outputPath
           error:(NSError **)error;
-
-// Fast video-only remux: copies video stream, skips audio. Much faster for large files.
-+ (BOOL)remuxVideoOnly:(NSString *)inputPath
-              toOutput:(NSString *)outputPath
-                 error:(NSError **)error;
 
 // Subtitle extraction
 + (nullable NSString *)extractSubtitleTrack:(int)trackIndex

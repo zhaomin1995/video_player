@@ -18,15 +18,12 @@ class PlayerViewController: NSViewController {
     private var subtitleBottomConstraint: NSLayoutConstraint?
 
     var onMouseMoved: (() -> Void)?
-    var onMouseExited: (() -> Void)?
     var onFileDropped: ((URL) -> Void)?
     var onDoubleClick: (() -> Void)?
     var onPlaybackStateChanged: ((Bool) -> Void)?
 
-    private var player: AVPlayer?
     private(set) var playerEngine: AVPlayerEngine?
     private(set) var vlcEngine: VLCPlayerEngine?
-    private var timeObserver: Any?
 
     private let subtitleManager = SubtitleManager()
     private let playlistManager = PlaylistManager()
@@ -43,10 +40,11 @@ class PlayerViewController: NSViewController {
     private let passthroughManager = AudioPassthroughManager()
     private var hasResizedForCurrentFile = false
     private(set) var chapters: [[String: Any]] = []
+    private var pendingAirPlayDevices: [CastDevice] = []
 
     var isPaused: Bool {
         if let vlc = vlcEngine { return !vlc.isPlaying }
-        return (player?.rate ?? 0) == 0
+        return (playerEngine?.player?.rate ?? 0) == 0
     }
 
     private func resizeWindowToFitVideo(_ videoSize: NSSize) {
@@ -102,7 +100,6 @@ class PlayerViewController: NSViewController {
         setupControlBar()
         setupOSD()
         setupGestureRecognizers()
-        registerForDraggedTypes()
         abLoopController.delegate = self
         passthroughManager.delegate = self
     }
@@ -120,12 +117,10 @@ class PlayerViewController: NSViewController {
         view.addTrackingArea(trackingArea)
     }
 
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        onMouseExited?()
-    }
-
     private func setupVideoView() {
+        videoView.onFileDropped = { [weak self] url in
+            self?.onFileDropped?(url)
+        }
         videoView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(videoView)
         NSLayoutConstraint.activate([
@@ -137,6 +132,9 @@ class PlayerViewController: NSViewController {
     }
 
     private func setupWelcomeView() {
+        welcomeView.onFileDropped = { [weak self] url in
+            self?.onFileDropped?(url)
+        }
         welcomeView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(welcomeView)
         NSLayoutConstraint.activate([
@@ -220,10 +218,6 @@ class PlayerViewController: NSViewController {
                 onDoubleClick?() // Exit fullscreen
             }
         }
-    }
-
-    private func registerForDraggedTypes() {
-        // Drag and drop handled by DragDropView (the root view)
     }
 
     @objc private func handleDoubleClick(_ gesture: NSClickGestureRecognizer) {
@@ -315,8 +309,7 @@ class PlayerViewController: NSViewController {
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
 
-        let playPause = menu.addItem(
-            withTitle: (playerEngine?.isPlaying ?? vlcEngine?.isPlaying ?? false) ? "Pause" : "Play",
+        menu.addItem(withTitle: (playerEngine?.isPlaying ?? vlcEngine?.isPlaying ?? false) ? "Pause" : "Play",
             action: #selector(AppDelegate.togglePlayPause(_:)), keyEquivalent: "")
         menu.addItem(.separator())
 
@@ -370,6 +363,18 @@ class PlayerViewController: NSViewController {
         saveCurrentPosition()
         currentFileURL = url
         hasResizedForCurrentFile = false
+
+        // Reset per-file state
+        subtitleManager.clear()
+        subtitleOverlayView.setText(nil)
+        audioDelayOffset = 0
+        abLoopController.clear()
+        videoRotation = 0
+        videoFlippedH = false
+        videoFlippedV = false
+        isFillScreen = false
+        videoView.setLayerTransform(CATransform3DIdentity)
+        chapters = []
         welcomeView.isHidden = true
         controlBarView.setVideoActive(true)
         playerEngine?.stop()
@@ -435,6 +440,8 @@ class PlayerViewController: NSViewController {
 
                 let eqPreset = UserDefaults.standard.integer(forKey: Defaults.defaultEQPreset)
                 if eqPreset > 0 { engine.setEqualizer(presetIndex: eqPreset) }
+
+                engine.startRendererDiscovery()
 
                 let autoPlay = UserDefaults.standard.bool(forKey: Defaults.autoPlayOnOpen)
                 if autoPlay {
@@ -612,19 +619,20 @@ class PlayerViewController: NSViewController {
         }    }
 
     func seek(by seconds: Double) {
-        var newTime: Double = 0
+        var currentBefore: Double = 0
         var dur: Double = 0
         if let engine = playerEngine {
-            engine.seek(by: seconds)
-            newTime = engine.currentTime
+            currentBefore = engine.currentTime
             dur = engine.duration
+            engine.seek(by: seconds)
         } else if let engine = vlcEngine {
-            engine.seek(by: seconds)
-            newTime = engine.currentTime
+            currentBefore = engine.currentTime
             dur = engine.duration
+            engine.seek(by: seconds)
         }
-        let pct = dur > 0 ? Int(newTime / dur * 100) : 0
-        let cur = formatSeekTime(newTime)
+        let expectedTime = max(0, min(dur, currentBefore + seconds))
+        let pct = dur > 0 ? Int(expectedTime / dur * 100) : 0
+        let cur = formatSeekTime(expectedTime)
         let total = formatSeekTime(dur)
         osdView.show(message: "Seek to \(cur) / \(total) (\(pct)%)")
     }
@@ -702,8 +710,6 @@ class PlayerViewController: NSViewController {
     func showAirPlayPicker() {
         controlBarView.showAirPlayPicker()
 
-        // After the user selects a device, check if video streaming activated.
-        // If only audio routed, fall back to moving the window to the external display.
         DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
             guard let self = self,
                   let player = self.playerEngine?.player,
@@ -711,6 +717,40 @@ class PlayerViewController: NSViewController {
             if NSScreen.screens.count > 1 {
                 self.moveToExternalDisplay()
             }
+        }
+    }
+
+    private var awaitingExternalDisplay = false
+
+    private func startMonitoringForExternalDisplay() {
+        guard !awaitingExternalDisplay else { return }
+        awaitingExternalDisplay = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenConfigurationChanged),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+            self?.stopMonitoringForExternalDisplay()
+        }
+    }
+
+    private func stopMonitoringForExternalDisplay() {
+        guard awaitingExternalDisplay else { return }
+        awaitingExternalDisplay = false
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+    }
+
+    @objc private func screenConfigurationChanged() {
+        guard awaitingExternalDisplay, NSScreen.screens.count > 1 else { return }
+        stopMonitoringForExternalDisplay()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.moveToExternalDisplay()
         }
     }
 
@@ -815,8 +855,16 @@ class PlayerViewController: NSViewController {
     }
 
     func toggleABLoop() {
-        guard let player = playerEngine?.player else { return }
-        abLoopController.toggle(currentTime: player.currentTime())
+        let currentSeconds: Double
+        if let engine = playerEngine {
+            currentSeconds = engine.currentTime
+        } else if let engine = vlcEngine {
+            currentSeconds = engine.currentTime
+        } else {
+            return
+        }
+        let cmTime = CMTimeMakeWithSeconds(currentSeconds, preferredTimescale: 600)
+        abLoopController.toggle(currentTime: cmTime)
         switch abLoopController.state {
         case .inactive:
             osdView.show(message: "A-B Loop cleared")
@@ -1058,7 +1106,8 @@ extension PlayerViewController: ControlBarDelegate {
             engine.seekToFraction(fraction)
         } else if let engine = vlcEngine {
             engine.seekToFraction(fraction)
-        }    }
+        }
+    }
 
     func controlBarVolumeChanged(to volume: Float) {
         playerEngine?.volume = volume
@@ -1084,6 +1133,76 @@ extension PlayerViewController: ControlBarDelegate {
 
     func controlBarNextClicked() {
         playNextTrack()
+    }
+
+    func controlBarAirPlayRequested() {
+        if NSScreen.screens.count > 1 {
+            moveToExternalDisplay()
+            return
+        }
+
+        if playerEngine != nil {
+            showAirPlayPicker()
+            return
+        }
+
+        guard let vlc = vlcEngine else { return }
+        let renderers = vlc.discoveredRenderers
+        if renderers.isEmpty {
+            osdView.show(message: "Searching for devices…", duration: 3.0)
+            vlc.startRendererDiscovery()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                guard let self = self, let vlc = self.vlcEngine else { return }
+                self.showRendererMenu(renderers: vlc.discoveredRenderers)
+            }
+            return
+        }
+        showRendererMenu(renderers: renderers)
+    }
+
+    private func showRendererMenu(renderers: [VLCPlayerEngine.RendererInfo]) {
+        if renderers.isEmpty {
+            osdView.show(message: "No devices found", duration: 3.0)
+            return
+        }
+
+        let menu = NSMenu(title: "Renderer")
+        for (index, renderer) in renderers.enumerated() {
+            let item = NSMenuItem(title: renderer.name, action: #selector(rendererSelected(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = index
+            menu.addItem(item)
+        }
+
+        let buttonFrame = controlBarView.castButtonFrameInWindow()
+        let localPoint = view.convert(NSPoint(x: buttonFrame.midX, y: buttonFrame.maxY + 4), from: nil)
+        menu.popUp(positioning: nil, at: localPoint, in: view)
+    }
+
+    @objc private func rendererSelected(_ sender: NSMenuItem) {
+        guard let vlc = vlcEngine, let fileURL = currentFileURL else { return }
+        let index = sender.tag
+        guard index < vlc.discoveredRenderers.count else { return }
+
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.castingManager.stop()
+        }
+
+        let renderer = vlc.discoveredRenderers[index]
+        let savedTime = vlc.currentTime
+
+        // Set renderer then restart playback without releasing the player
+        vlc.setRenderer(renderer)
+        if let p = vlc.player {
+            libvlc_media_player_stop(p)
+            libvlc_media_player_play(p)
+            if savedTime > 1 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    vlc.seekTo(time: savedTime)
+                }
+            }
+        }
+        osdView.show(message: "Casting to \(renderer.name)…", duration: 3.0)
     }
 }
 
@@ -1187,6 +1306,9 @@ extension PlayerViewController: VLCPlayerEngineDelegate {
             subtitleOverlayView.setText(nil)
         }
 
+        let cmTime = CMTimeMakeWithSeconds(current, preferredTimescale: 600)
+        abLoopController.checkLoop(currentTime: cmTime)
+
         (NSApp.delegate as? AppDelegate)?.nowPlayingController.updateTime(
             elapsed: current, rate: Double(vlcEngine?.rate ?? 1.0)
         )
@@ -1256,7 +1378,12 @@ extension PlayerViewController: ABLoopDelegate {
     func abLoopStateChanged(_ state: ABLoopState) {}
 
     func abLoopShouldSeek(to time: CMTime) {
-        playerEngine?.player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        let seconds = time.seconds
+        if let engine = playerEngine {
+            engine.seekTo(time: seconds)
+        } else if let engine = vlcEngine {
+            engine.seekTo(time: seconds)
+        }
     }
 }
 
