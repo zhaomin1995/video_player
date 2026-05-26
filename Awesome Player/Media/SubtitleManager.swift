@@ -11,11 +11,6 @@ class SubtitleManager {
         currentIndex = 0
     }
 
-    func loadEntries(_ newEntries: [SubtitleEntry]) {
-        entries = newEntries
-        currentIndex = 0
-    }
-
     func loadSubtitleFromSRTText(_ srtText: String) {
         entries = SubtitleParser.parseSRTString(srtText)
         currentIndex = 0

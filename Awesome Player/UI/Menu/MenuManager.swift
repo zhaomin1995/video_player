@@ -62,10 +62,11 @@ class AudioDeviceMenuDelegate: NSObject, NSMenuDelegate {
                 mScope: kAudioObjectPropertyScopeGlobal,
                 mElement: kAudioObjectPropertyElementMain
             )
-            var nameRef: CFString = "" as CFString
-            guard AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &nameRef) == noErr else { continue }
+            var nameUnmanaged: Unmanaged<CFString>?
+            guard AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &nameUnmanaged) == noErr,
+                  let name = nameUnmanaged?.takeUnretainedValue() as String? else { continue }
 
-            let item = NSMenuItem(title: nameRef as String, action: #selector(AppDelegate.selectOutputDevice(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: name, action: #selector(AppDelegate.selectOutputDevice(_:)), keyEquivalent: "")
             item.tag = Int(deviceID)
             item.target = nil
             if deviceID == defaultDevice {

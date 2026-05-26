@@ -156,12 +156,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let formatID: String
         let height: Int
         let ext: String
-        let vcodec: String
-        let acodec: String
         let hasAudio: Bool
-        var label: String {
-            "\(height)p (\(ext.uppercased()))"
-        }
     }
 
     private func resolveWithYTDLP(_ urlString: String) {
@@ -190,22 +185,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             for fmt in formats {
                 guard let fid = fmt["format_id"] as? String,
                       let height = fmt["height"] as? Int, height > 0,
-                      let vcodec = fmt["vcodec"] as? String, vcodec != "none",
+                      let vc = fmt["vcodec"] as? String, vc != "none",
                       let ext = fmt["ext"] as? String else { continue }
-                let acodec = (fmt["acodec"] as? String) ?? "none"
-                let hasAudio = acodec != "none"
-                // Prefer mp4/h264 for compatibility, one entry per resolution
-                let key = height
-                if seenHeights.contains(key) {
+                let hasAudio = ((fmt["acodec"] as? String) ?? "none") != "none"
+                if seenHeights.contains(height) {
                     if let idx = videoFormats.firstIndex(where: { $0.height == height }) {
                         let existing = videoFormats[idx]
                         if ext == "mp4" && existing.ext != "mp4" {
-                            videoFormats[idx] = YTDLPFormat(formatID: fid, height: height, ext: ext, vcodec: vcodec, acodec: acodec, hasAudio: hasAudio)
+                            videoFormats[idx] = YTDLPFormat(formatID: fid, height: height, ext: ext, hasAudio: hasAudio)
                         }
                     }
                 } else {
-                    seenHeights.insert(key)
-                    videoFormats.append(YTDLPFormat(formatID: fid, height: height, ext: ext, vcodec: vcodec, acodec: acodec, hasAudio: hasAudio))
+                    seenHeights.insert(height)
+                    videoFormats.append(YTDLPFormat(formatID: fid, height: height, ext: ext, hasAudio: hasAudio))
                 }
             }
             videoFormats.sort { $0.height > $1.height }

@@ -40,7 +40,6 @@ class PlayerViewController: NSViewController {
     private let passthroughManager = AudioPassthroughManager()
     private var hasResizedForCurrentFile = false
     private(set) var chapters: [[String: Any]] = []
-    private var pendingAirPlayDevices: [CastDevice] = []
 
     var isPaused: Bool {
         if let vlc = vlcEngine { return !vlc.isPlaying }
@@ -375,6 +374,7 @@ class PlayerViewController: NSViewController {
         isFillScreen = false
         videoView.setLayerTransform(CATransform3DIdentity)
         chapters = []
+        playbackStatusObservation = nil
         welcomeView.isHidden = true
         controlBarView.setVideoActive(true)
         playerEngine?.stop()
@@ -382,7 +382,7 @@ class PlayerViewController: NSViewController {
         if !playlistManager.items.contains(url) {
             playlistManager.addItem(url)
         }
-        playlistManager.selectItem(at: playlistManager.items.firstIndex(of: url) ?? 0)
+        _ = playlistManager.selectItem(at: playlistManager.items.firstIndex(of: url) ?? 0)
 
         let vol = UserDefaults.standard.double(forKey: Defaults.defaultVolume)
 
@@ -518,7 +518,7 @@ class PlayerViewController: NSViewController {
                 var codecName = info.videoCodec.rawValue
                 var isDV = info.isDolbyVision
                 var isHDR = info.hdrType != .sdr
-                var isAtmos = info.isDolbyAtmos
+                let isAtmos = info.isDolbyAtmos
 
                 if !isNative || codecName == VideoCodec.unknown.rawValue {
                     if let ffName = FFmpegBridge.videoCodecName(forFile: url.path) {
@@ -912,7 +912,7 @@ class PlayerViewController: NSViewController {
     // MARK: - Video Size & Transform
 
     func setVideoWindowSize(scale: CGFloat) {
-        guard let window = view.window, let videoSize = playerEngine?.videoSize else {
+        guard let window = view.window, let videoSize = playerEngine?.videoSize ?? vlcEngine?.videoSize else {
             osdView.show(message: "No video loaded")
             return
         }
@@ -1214,7 +1214,7 @@ extension PlayerViewController: ControlBarDelegate {
     }
 
     @objc private func rendererSelected(_ sender: NSMenuItem) {
-        guard let vlc = vlcEngine, let fileURL = currentFileURL else { return }
+        guard let vlc = vlcEngine, currentFileURL != nil else { return }
         let index = sender.tag
         guard index < vlc.discoveredRenderers.count else { return }
 
@@ -1396,7 +1396,7 @@ extension PlayerViewController: PlaylistPanelDelegate {
     func playlistPanel(_ panel: PlaylistPanelView, didSelectItemAt index: Int) {
         guard index < playlistManager.items.count else { return }
         let url = playlistManager.items[index]
-        playlistManager.selectItem(at: index)
+        _ = playlistManager.selectItem(at: index)
         openFile(url: url)
     }
 

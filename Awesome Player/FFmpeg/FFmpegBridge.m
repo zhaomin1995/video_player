@@ -51,9 +51,8 @@
             result.width = codecpar->width;
             result.height = codecpar->height;
 
-            // Dolby Vision uses a dedicated side data entry, not a codec flag
-            for (int j = 0; j < stream->nb_side_data; j++) {
-                if (stream->side_data[j].type == AV_PKT_DATA_DOVI_CONF) {
+            for (int j = 0; j < codecpar->nb_coded_side_data; j++) {
+                if (codecpar->coded_side_data[j].type == AV_PKT_DATA_DOVI_CONF) {
                     result.hasDolbyVision = YES;
                 }
             }
@@ -304,7 +303,10 @@ static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
             enc_ctx->sample_rate = codecpar->sample_rate;
             enc_ctx->bit_rate = 128000;
             av_channel_layout_default(&enc_ctx->ch_layout, codecpar->ch_layout.nb_channels);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             enc_ctx->sample_fmt = encoder->sample_fmts ? encoder->sample_fmts[0] : AV_SAMPLE_FMT_FLTP;
+#pragma clang diagnostic pop
             enc_ctx->time_base = (AVRational){1, codecpar->sample_rate};
             if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
                 enc_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
