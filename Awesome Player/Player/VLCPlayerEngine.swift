@@ -112,13 +112,22 @@ class VLCPlayerEngine {
         stop()
     }
 
-    func open(url: URL) -> Bool {
+    func open(url: URL, audioURL: URL? = nil) -> Bool {
         guard let inst = instance else { return false }
 
-        media = libvlc_media_new_path(inst, url.path)
+        if url.isFileURL {
+            media = libvlc_media_new_path(inst, url.path)
+        } else {
+            media = libvlc_media_new_location(inst, url.absoluteString)
+        }
         guard media != nil else {
-            print("[VLCEngine] Failed to create media for: \(url.path)")
+            print("[VLCEngine] Failed to create media for: \(url.absoluteString)")
             return false
+        }
+
+        if let audioURL = audioURL {
+            let slave = ":input-slave=\(audioURL.absoluteString)"
+            libvlc_media_add_option(media, slave)
         }
 
         // Apply audio normalization if enabled

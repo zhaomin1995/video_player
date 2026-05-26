@@ -32,6 +32,7 @@ void libvlc_release(libvlc_instance_t *p_instance);
 
 // Media
 libvlc_media_t *libvlc_media_new_path(libvlc_instance_t *p_instance, const char *path);
+libvlc_media_t *libvlc_media_new_location(libvlc_instance_t *p_instance, const char *psz_mrl);
 void libvlc_media_release(libvlc_media_t *p_md);
 void libvlc_media_parse(libvlc_media_t *p_md);
 int64_t libvlc_media_get_duration(libvlc_media_t *p_md);

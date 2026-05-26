@@ -450,6 +450,7 @@ class MenuManager {
 
         mainMenu.addItem(createAppMenu())
         mainMenu.addItem(createFileMenu())
+        mainMenu.addItem(createEditMenu())
         mainMenu.addItem(createPlaybackMenu())
         mainMenu.addItem(createAudioMenu())
         mainMenu.addItem(createVideoMenu())
@@ -482,6 +483,22 @@ class MenuManager {
         menu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Awesome Player", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+
+        menuItem.submenu = menu
+        return menuItem
+    }
+
+    private static func createEditMenu() -> NSMenuItem {
+        let menuItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: "Edit")
+
+        menu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        menu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        menu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        menu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        menu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
         menuItem.submenu = menu
         return menuItem

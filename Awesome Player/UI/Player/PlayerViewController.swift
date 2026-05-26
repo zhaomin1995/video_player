@@ -541,6 +541,40 @@ class PlayerViewController: NSViewController {
         }
     }
 
+    func openStream(videoURL: URL, audioURL: URL?) {
+        saveCurrentPosition()
+        welcomeView.isHidden = true
+        controlBarView.setVideoActive(true)
+        playerEngine?.stop()
+        playerEngine = nil
+
+        let engine = VLCPlayerEngine()
+        vlcEngine?.stop()
+        vlcEngine = engine
+        engine.delegate = self
+
+        if engine.open(url: videoURL, audioURL: audioURL) {
+            let vlcView = engine.renderView
+            vlcView.translatesAutoresizingMaskIntoConstraints = false
+            videoView.subviews.forEach { $0.removeFromSuperview() }
+            videoView.addSubview(vlcView)
+            NSLayoutConstraint.activate([
+                vlcView.topAnchor.constraint(equalTo: videoView.topAnchor),
+                vlcView.bottomAnchor.constraint(equalTo: videoView.bottomAnchor),
+                vlcView.leadingAnchor.constraint(equalTo: videoView.leadingAnchor),
+                vlcView.trailingAnchor.constraint(equalTo: videoView.trailingAnchor),
+            ])
+            controlBarView.setAirPlayAvailable(false)
+            let vol = UserDefaults.standard.double(forKey: Defaults.defaultVolume)
+            engine.volume = Float(vol > 0 ? vol : 1.0)
+            controlBarView.setVolume(engine.volume)
+            engine.play()
+            controlBarView.setPlaying(true)
+        } else {
+            showOSD("Failed to open stream")
+        }
+    }
+
     private var playbackStatusObservation: NSKeyValueObservation?
 
     /// Wires the engine to the video view and waits for .readyToPlay before auto-playing.

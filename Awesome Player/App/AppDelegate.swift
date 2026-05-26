@@ -119,41 +119,168 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return mediaExts.contains(where: { lower.hasSuffix(".\($0)") })
     }
 
+    private func findYTDLP() -> String? {
+        let bundledPath = Bundle.main.resourceURL?.appendingPathComponent("yt-dlp/yt-dlp_macos").path
+        let searchPaths = [bundledPath, "/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"].compactMap { $0 }
+        return searchPaths.first(where: { FileManager.default.fileExists(atPath: $0) })
+    }
+
+    private func runYTDLP(_ ytdlp: String, arguments: [String]) -> (stdout: String, stderr: String, exitCode: Int32)? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: ytdlp)
+        process.currentDirectoryURL = URL(fileURLWithPath: ytdlp).deletingLastPathComponent()
+        process.arguments = arguments
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+
+        do { try process.run() } catch { return nil }
+
+        var errData = Data()
+        let errThread = Thread { errData = errPipe.fileHandleForReading.readDataToEndOfFile() }
+        errThread.start()
+        let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        while !errThread.isFinished { Thread.sleep(forTimeInterval: 0.01) }
+
+        return (
+            String(data: outData, encoding: .utf8) ?? "",
+            String(data: errData, encoding: .utf8) ?? "",
+            process.terminationStatus
+        )
+    }
+
+    private struct YTDLPFormat {
+        let formatID: String
+        let height: Int
+        let ext: String
+        let vcodec: String
+        let acodec: String
+        let hasAudio: Bool
+        var label: String {
+            "\(height)p (\(ext.uppercased()))"
+        }
+    }
+
     private func resolveWithYTDLP(_ urlString: String) {
-        let ytdlpPaths = ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"]
-        guard let ytdlp = ytdlpPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
-            windowController?.playerViewController.showOSD("yt-dlp not found — install via: brew install yt-dlp", duration: 5.0)
+        guard let ytdlp = findYTDLP() else {
+            windowController?.playerViewController.showOSD("yt-dlp not found", duration: 5.0)
             return
         }
-        windowController?.playerViewController.showOSD("Resolving URL…", duration: 10.0)
+        windowController?.playerViewController.showOSD("Fetching formats…", duration: 60.0)
+
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: ytdlp)
-            process.arguments = ["--get-url", "-f", "best", urlString]
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = Pipe()
-            do {
-                try process.run()
-                process.waitUntilExit()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !output.isEmpty,
-                   let resolvedURL = URL(string: output.components(separatedBy: "\n").first ?? "") {
-                    DispatchQueue.main.async {
-                        self?.windowController?.openFile(url: resolvedURL)
+            guard let result = self?.runYTDLP(ytdlp, arguments: ["-j", "--no-warnings", "--no-playlist", urlString]),
+                  result.exitCode == 0,
+                  let jsonData = result.stdout.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let formats = json["formats"] as? [[String: Any]] else {
+                DispatchQueue.main.async {
+                    self?.windowController?.playerViewController.showOSD("Failed to fetch video info", duration: 5.0)
+                }
+                return
+            }
+
+            let title = json["title"] as? String ?? urlString
+
+            var videoFormats: [YTDLPFormat] = []
+            var seenHeights = Set<Int>()
+            for fmt in formats {
+                guard let fid = fmt["format_id"] as? String,
+                      let height = fmt["height"] as? Int, height > 0,
+                      let vcodec = fmt["vcodec"] as? String, vcodec != "none",
+                      let ext = fmt["ext"] as? String else { continue }
+                let acodec = (fmt["acodec"] as? String) ?? "none"
+                let hasAudio = acodec != "none"
+                // Prefer mp4/h264 for compatibility, one entry per resolution
+                let key = height
+                if seenHeights.contains(key) {
+                    if let idx = videoFormats.firstIndex(where: { $0.height == height }) {
+                        let existing = videoFormats[idx]
+                        if ext == "mp4" && existing.ext != "mp4" {
+                            videoFormats[idx] = YTDLPFormat(formatID: fid, height: height, ext: ext, vcodec: vcodec, acodec: acodec, hasAudio: hasAudio)
+                        }
                     }
                 } else {
-                    DispatchQueue.main.async {
-                        self?.windowController?.playerViewController.showOSD("Failed to resolve URL")
-                    }
+                    seenHeights.insert(key)
+                    videoFormats.append(YTDLPFormat(formatID: fid, height: height, ext: ext, vcodec: vcodec, acodec: acodec, hasAudio: hasAudio))
                 }
-            } catch {
+            }
+            videoFormats.sort { $0.height > $1.height }
+
+            guard !videoFormats.isEmpty else {
                 DispatchQueue.main.async {
-                    self?.windowController?.playerViewController.showOSD("yt-dlp error: \(error.localizedDescription)")
+                    self?.windowController?.playerViewController.showOSD("No video formats found", duration: 5.0)
+                }
+                return
+            }
+
+            DispatchQueue.main.async {
+                self?.windowController?.playerViewController.showOSD("")
+                self?.showResolutionPicker(title: title, formats: videoFormats, ytdlp: ytdlp, urlString: urlString)
+            }
+        }
+    }
+
+    private func showResolutionPicker(title: String, formats: [YTDLPFormat], ytdlp: String, urlString: String) {
+        let alert = NSAlert()
+        alert.messageText = "Select Resolution"
+        alert.informativeText = title
+        alert.addButton(withTitle: "Play")
+        alert.addButton(withTitle: "Cancel")
+
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 300, height: 28), pullsDown: false)
+        for fmt in formats {
+            let suffix = fmt.hasAudio ? "" : " (video+audio merge)"
+            popup.addItem(withTitle: "\(fmt.height)p\(suffix)")
+        }
+        popup.selectItem(at: 0)
+        alert.accessoryView = popup
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let chosen = formats[popup.indexOfSelectedItem]
+        windowController?.playerViewController.showOSD("Loading \(chosen.height)p…", duration: 60.0)
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var formatSpec = chosen.formatID
+            if !chosen.hasAudio {
+                formatSpec = "\(chosen.formatID)+bestaudio[ext=m4a]/\(chosen.formatID)+bestaudio"
+            }
+            guard let result = self?.runYTDLP(ytdlp, arguments: ["--get-url", "-f", formatSpec, "--no-warnings", "--no-playlist", urlString]),
+                  result.exitCode == 0 else {
+                DispatchQueue.main.async {
+                    self?.windowController?.playerViewController.showOSD("Failed to get stream URL", duration: 5.0)
+                }
+                return
+            }
+
+            let urls = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "\n").compactMap { URL(string: $0) }
+            guard let videoURL = urls.first else {
+                DispatchQueue.main.async {
+                    self?.windowController?.playerViewController.showOSD("Failed to get stream URL", duration: 5.0)
+                }
+                return
+            }
+
+            let audioURL = urls.count > 1 ? urls[1] : nil
+
+            DispatchQueue.main.async {
+                if audioURL != nil {
+                    self?.openStreamWithVLC(videoURL: videoURL, audioURL: audioURL, title: title)
+                } else {
+                    self?.windowController?.openFile(url: videoURL)
                 }
             }
         }
+    }
+
+    private func openStreamWithVLC(videoURL: URL, audioURL: URL?, title: String) {
+        guard let vc = windowController?.playerViewController else { return }
+        vc.openStream(videoURL: videoURL, audioURL: audioURL)
+        windowController?.titleBarView.setTitle(title)
     }
 
     @objc func addSubtitleFile(_ sender: Any?) {
