@@ -263,10 +263,17 @@ static BOOL isAudioCodecMP4Compatible(enum AVCodecID codec_id) {
 
         if (codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
             avcodec_parameters_copy(out_stream->codecpar, codecpar);
-            // Use hvc1 tag for HEVC so AVPlayer recognizes it properly
-            // (hev1 with DV side data can cause black screen if DV boxes are missing)
             if (codecpar->codec_id == AV_CODEC_ID_HEVC) {
-                out_stream->codecpar->codec_tag = MKTAG('h','v','c','1');
+                // dvh1 tells AVPlayer "this is Dolby Vision" and makes the MP4
+                // muxer write the dvcC configuration box (with `strict unofficial`
+                // set on write_header). Without dvh1, AVPlayer decodes as plain
+                // HEVC and DV Profile 5's IPT-PQ pixels render with wrong colors.
+                // Fall back to hvc1 for non-DV HEVC so plain HEVC stays recognized.
+                BOOL hasDV = NO;
+                for (int s = 0; s < codecpar->nb_coded_side_data; s++) {
+                    if (codecpar->coded_side_data[s].type == AV_PKT_DATA_DOVI_CONF) { hasDV = YES; break; }
+                }
+                out_stream->codecpar->codec_tag = hasDV ? MKTAG('d','v','h','1') : MKTAG('h','v','c','1');
             } else {
                 out_stream->codecpar->codec_tag = 0;
             }

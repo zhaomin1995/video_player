@@ -39,6 +39,7 @@ class PlayerViewController: NSViewController {
     private var audioDelayOffset: Double = 0
     private let passthroughManager = AudioPassthroughManager()
     private var hasResizedForCurrentFile = false
+    private var currentFileIsDolbyVision = false
     private(set) var chapters: [[String: Any]] = []
 
     var isPaused: Bool {
@@ -374,6 +375,7 @@ class PlayerViewController: NSViewController {
         isFillScreen = false
         videoView.setLayerTransform(CATransform3DIdentity)
         chapters = []
+        currentFileIsDolbyVision = false
         playbackStatusObservation = nil
         welcomeView.isHidden = true
         controlBarView.setVideoActive(true)
@@ -406,6 +408,26 @@ class PlayerViewController: NSViewController {
             }
             playWithEngine(engine, url: url, fallbackRemux: false)
             controlBarView.setAirPlayAvailable(true)
+        } else if FFmpegBridge.probeFile(url.path).hasDolbyVision.boolValue {
+            // Dolby Vision in a non-native container (e.g. MKV). libvlc renders
+            // DV Profile 5 with wrong colors (IPT-PQ pixels misinterpreted as
+            // BT.2020). Remux to MP4 so AVPlayer's hardware DV decoder handles it.
+            playerEngine?.stop()
+            playerEngine = nil
+            let engine = AVPlayerEngine()
+            playerEngine = engine
+            engine.delegate = self
+            engine.useKeyframeSeeking = useKeyframeSeeking
+            engine.volume = Float(vol > 0 ? vol : 1.0)
+            controlBarView.setVolume(engine.volume)
+            let speed = UserDefaults.standard.double(forKey: Defaults.defaultSpeed)
+            if speed > 0 && speed != 1.0 {
+                engine.rate = Float(speed)
+                controlBarView.setSpeed(Float(speed))
+            }
+            controlBarView.setAirPlayAvailable(true)
+            osdView.show(message: "Preparing Dolby Vision playback…", duration: 60.0)
+            remuxAndPlay(engine: engine, url: url)
         } else {
             // MKV/AVI/WebM — use VLC engine for instant playback
             playerEngine?.stop()
@@ -528,6 +550,8 @@ class PlayerViewController: NSViewController {
                     if probe.hasDolbyVision.boolValue { isDV = true; isHDR = true }
                     if probe.hasHDR.boolValue { isHDR = true }
                 }
+
+                self.currentFileIsDolbyVision = isDV
 
                 if let wc = self.view.window?.windowController as? PlayerWindowController {
                     wc.titleBarView.updateBadges(
@@ -1295,7 +1319,18 @@ extension PlayerViewController: AVPlayerEngineDelegate {
 
     func playerEngineExternalPlaybackChanged(isActive: Bool) {
         if isActive {
-            osdView.show(message: "AirPlay: Playing on TV", duration: 3.0)
+            // Dolby Vision Profile 5 (IPT-PQ, non-backward-compatible) can't be
+            // sent over AirPlay — the session establishes but Apple TV won't
+            // decode the stream, leaving the user with a "connected" banner and
+            // no video. Tell them how to work around it with Screen Mirroring.
+            if currentFileIsDolbyVision {
+                osdView.show(
+                    message: "Dolby Vision isn't AirPlay-compatible. Use Control Center → Screen Mirroring → pick TV → 'Use as Separate Display', then drag this window there.",
+                    duration: 8.0
+                )
+            } else {
+                osdView.show(message: "AirPlay: Playing on TV", duration: 3.0)
+            }
         } else {
             osdView.show(message: "AirPlay: Local playback")
         }
