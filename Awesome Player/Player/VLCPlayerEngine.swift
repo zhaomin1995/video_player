@@ -3,6 +3,42 @@
 /// Uses libvlc event manager for time/position updates instead of polling.
 import Cocoa
 
+/// 10-band custom EQ preset. Bands target the standard ISO frequencies
+/// libvlc uses (60, 170, 310, 600, 1k, 3k, 6k, 12k, 14k, 16k Hz). Values
+/// are in dB, range typically [-20, +20]. Preset values mirror the macOS
+/// Music app / Movist Pro defaults so users see familiar behavior.
+struct AudioEqualizerPreset {
+    let name: String
+    let preamp: Float
+    let bands: [Float]   // 10 values, one per ISO band
+
+    static let all: [AudioEqualizerPreset] = [
+        AudioEqualizerPreset(name: "Flat",            preamp: 0,   bands: [ 0,    0,    0,    0,    0,    0,    0,    0,    0,    0  ]),
+        AudioEqualizerPreset(name: "Acoustic",        preamp: 6,   bands: [ 5,    4.5,  3.5,  1,    1.5,  1.5,  3.5,  3.5,  3.5,  2.5]),
+        AudioEqualizerPreset(name: "Bass Booster",    preamp: 6,   bands: [ 5.5,  4.5,  3.5,  2.5,  1,    0,    0,    0,    0,    0  ]),
+        AudioEqualizerPreset(name: "Bass Reducer",    preamp: 0,   bands: [-5.5, -4.5, -3.5, -2.5, -1,    0,    0,    0,    0,    0  ]),
+        AudioEqualizerPreset(name: "Classical",       preamp: 0,   bands: [ 0,    0,    0,    0,    0,    0,   -4,   -4,   -4,   -5.5]),
+        AudioEqualizerPreset(name: "Dance",           preamp: 6,   bands: [ 4.5,  6.5,  5,    0,    1.5,  3,    4,    4,    4,    0  ]),
+        AudioEqualizerPreset(name: "Deep",            preamp: 6,   bands: [ 5,    3,    1.5,  1,    3,    1.5, -2,   -3.5, -4,   -4.5]),
+        AudioEqualizerPreset(name: "Electronic",      preamp: 6,   bands: [ 4.5,  3.5,  1,    0,   -2,    2,    1,    1,    4,    4.5]),
+        AudioEqualizerPreset(name: "Hip-Hop",         preamp: 6,   bands: [ 5,    4,    1.5,  3,   -1,   -1,    1.5, -0.5,  1.5,  3  ]),
+        AudioEqualizerPreset(name: "Jazz",            preamp: 6,   bands: [ 4,    3,    1.5,  2,   -2,   -2,    0,    1.5,  3,    4  ]),
+        AudioEqualizerPreset(name: "Latin",           preamp: 6,   bands: [ 4.5,  3,    0,    0,   -2,   -2,   -2,    0,    3,    4.5]),
+        AudioEqualizerPreset(name: "Loudness",        preamp: 6,   bands: [ 5.5,  4,    0,    0,   -2,    0,   -1,   -5,    5,    1  ]),
+        AudioEqualizerPreset(name: "Lounge",          preamp: 3,   bands: [-3,   -2,   -1,    1,    4,    2.5,  0,   -2,    2,    1  ]),
+        AudioEqualizerPreset(name: "Perfect :)",      preamp: 4,   bands: [ 3,    2,    1.5,  1,    1,    1,    2,    2,    2.5,  3  ]),
+        AudioEqualizerPreset(name: "Piano",           preamp: 4,   bands: [ 3,    2,    0,    2.5,  3,    1,    3,    4.5,  3,    3.5]),
+        AudioEqualizerPreset(name: "Pop",             preamp: 4,   bands: [-1.5, -1,    0,    2,    4.5,  4.5,  2,   -1,   -1.5, -1.5]),
+        AudioEqualizerPreset(name: "R&B",             preamp: 6,   bands: [ 3,    7,    6,    1,   -2,   -1.5,  2,    2.5,  3,    4  ]),
+        AudioEqualizerPreset(name: "Rock",            preamp: 6,   bands: [ 5,    4,    3,    1.5, -0.5, -1,    0.5,  3,    4,    4.5]),
+        AudioEqualizerPreset(name: "Small Speakers",  preamp: 6,   bands: [ 5,    4,    3,    2,    1,    0,   -2,   -3,   -4,   -5  ]),
+        AudioEqualizerPreset(name: "Spoken Word",     preamp: 3,   bands: [-3,   -0.5,  0,    0.5,  3,    3.5,  4,    3.5,  3,    0  ]),
+        AudioEqualizerPreset(name: "Treble Booster",  preamp: 6,   bands: [ 0,    0,    0,    0,    0,    1,    3,    4.5,  5,    5.5]),
+        AudioEqualizerPreset(name: "Treble Reducer",  preamp: 0,   bands: [ 0,    0,    0,    0,    0,   -1,   -3,   -4.5, -5,   -5.5]),
+        AudioEqualizerPreset(name: "Vocal Booster",   preamp: 4,   bands: [-1.5, -3,   -3,    1.5,  3.5,  3.5,  2.5,  1.5,  0,   -1.5]),
+    ]
+}
+
 protocol VLCPlayerEngineDelegate: AnyObject {
     func vlcEngineTimeDidChange(current: Double, duration: Double)
     func vlcEngineDidFinishPlaying()
@@ -39,6 +75,10 @@ class VLCPlayerEngine {
     static func preload() {
         _ = sharedVLCInstance
     }
+
+    /// Exposed for headless users of libvlc (e.g. the Convert/Stream window
+    /// which uses a separate media player for transcode pipelines).
+    static var sharedInstance: OpaquePointer? { sharedVLCInstance }
 
     private var instance: OpaquePointer?
     private(set) var player: OpaquePointer?
@@ -137,6 +177,19 @@ class VLCPlayerEngine {
             if UserDefaults.standard.bool(forKey: Defaults.compressorEnabled) {
                 libvlc_media_add_option(m, "--audio-filter=compressor")
             }
+            // Snap seeks to the nearest keyframe instead of decoding forward
+            // to an exact frame. Trades up to ~1s of seek-position accuracy
+            // for sub-100ms response. Matches what the AVPlayer path now does
+            // (positive-infinity tolerance) so both engines feel equally snappy.
+            libvlc_media_add_option(m, ":input-fast-seek")
+            // libvlc defaults file-caching to 1000ms — after every seek it
+            // buffers a full second of demuxed media before resuming playback.
+            // That is literally the "1s seek lag" we see with the libvlc path
+            // (and the same lag VLC.app has). Movist Pro avoids it because it
+            // uses FFmpeg directly without libvlc's input-buffer layer. 100ms
+            // is enough to absorb any disk-read jitter on local files.
+            libvlc_media_add_option(m, ":file-caching=100")
+            libvlc_media_add_option(m, ":network-caching=300")
         }
 
         player = libvlc_media_player_new_from_media(media)
@@ -363,13 +416,30 @@ class VLCPlayerEngine {
 
     // MARK: - Equalizer
 
+    /// Applies a 10-band custom EQ preset by name. The preset's preamp +
+    /// per-band amplification values come from `AudioEqualizerPreset.all`.
+    /// `index == 0` means "Off" — disables EQ entirely.
     func setEqualizer(presetIndex: Int) {
         guard let p = player else { return }
-        if let eq = equalizer { libvlc_audio_equalizer_release(eq) }
-        equalizer = libvlc_audio_equalizer_new_from_preset(UInt32(presetIndex))
-        if let eq = equalizer {
-            libvlc_media_player_set_equalizer(p, eq)
+        if let eq = equalizer { libvlc_audio_equalizer_release(eq); equalizer = nil }
+
+        if presetIndex <= 0 {
+            libvlc_media_player_set_equalizer(p, nil)
+            return
         }
+
+        let presets = AudioEqualizerPreset.all
+        guard presetIndex - 1 < presets.count else { return }
+        let preset = presets[presetIndex - 1]
+
+        guard let eq = libvlc_audio_equalizer_new() else { return }
+        libvlc_audio_equalizer_set_preamp(eq, preset.preamp)
+        let bandCount = min(preset.bands.count, Int(libvlc_audio_equalizer_get_band_count()))
+        for i in 0..<bandCount {
+            libvlc_audio_equalizer_set_amp_at_index(eq, preset.bands[i], UInt32(i))
+        }
+        equalizer = eq
+        libvlc_media_player_set_equalizer(p, eq)
     }
 
     func disableEqualizer() {
