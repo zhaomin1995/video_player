@@ -112,15 +112,93 @@ Vendor/
 - `ENABLE_USER_SCRIPT_SANDBOXING` must be `NO` or build scripts can't access `Vendor/` directory
 - Bundled FFmpeg dylibs must use `@rpath` for inter-library deps, not absolute paths. If a freshly built/downloaded dylib has its install ID as `@rpath/...` but references siblings via an absolute build-machine path (visible in `otool -L`), the app will crash at launch with `dyld: Library not loaded` on any other machine. Patch with `install_name_tool -change /abs/path/libfoo.X.dylib @rpath/libfoo.X.Y.Z.dylib <dylib>` for each bad dep, then `codesign --force --sign - <dylib>` to restore the ad-hoc signature. The build script only copies fully-versioned files (e.g. `libavcodec.61.19.101.dylib`), so the `@rpath` target must be the fully-versioned name, not the major-only soname
 
-### Casting Dolby Vision to non-DV TVs (Samsung etc.)
+### Casting Dolby Vision (currently unsupported — see findings)
 
-- Three transport paths exist; only DLNA preserves color for DV content on non-DV TVs:
-  - **AVKit AirPlay** (AVRoutePickerView/AVPlayer): silently fails against Samsung's third-party AirPlay 2 receiver — session opens, "Connected to MacBook" banner shows, but media never flows. Works fine for Apple TV.
-  - **libvlc chromecast renderer**: works *from VLC.app* against Samsung TVs (the receiver is discovered as type=chromecast via Samsung's Cast-flavored mDNS), but the sout chain re-encodes HEVC HDR10 → H.264 SDR — colors are wrong on TV. Also fails to push from our process despite identical libvlc/plugins/permissions; root cause never identified, abandoned this path.
-  - **DLNA push** (`DLNAManager` + `CastingHTTPServer`): works. Samsung TVs decode HEVC HDR10 natively when served via DLNA AVTransport. This is the path the DV AirPlay flow uses.
-- DV pipeline: `HDRTranscoder` spawns the bundled `Vendor/ffmpeg-cli/bin/ffmpeg` with `libplacebo=...:apply_dolbyvision=true` (default true, this is the option name; `apply_dovi` was renamed long ago) → `hevc_videotoolbox` 25 Mbps HDR10 → `CastingHTTPServer` serves the result → `DLNAManager.loadMedia()` issues SetAVTransportURI + Play.
-- `Vendor/ffmpeg-cli/` bundles ffmpeg (built from FFmpeg 7.1 with `--enable-libplacebo --enable-videotoolbox`) + libplacebo + Vulkan loader + MoltenVK + lcms2 + shaderc + a MoltenVK ICD JSON. `HDRTranscoder` sets `VK_ICD_FILENAMES` to the bundled ICD path before spawning. The ICD JSON's `library_path` is `../../../lib/libMoltenVK.dylib` — only resolves correctly if the JSON sits at `<bundle>/etc/vulkan/icd.d/MoltenVK_icd.json` and MoltenVK at `<bundle>/lib/`, so the directory layout matters.
-- Samsung TVs don't support Dolby Vision at all — they only decode HDR10/HDR10+/HLG. Always tone-map DV → HDR10 before pushing; preserving DV signaling on the output is pointless and may confuse some receivers.
+DV casting is intentionally disabled. When the user clicks AirPlay on a DV
+file, the app shows an OSD "Casting Dolby Vision isn't supported. Play
+locally instead." Local DV playback still works correctly via the existing
+DV-detect → remux to MP4 with `dvh1` tag → AVPlayer hardware DV decoder path.
+
+This section is a knowledge dump from a long investigation. **Don't rebuild
+without reading this first**; we spent significant time discovering that
+none of the obvious transports actually work for DV→non-DV TVs end-to-end.
+
+**The fundamental problem.** Non-DV TVs (Samsung, most non-LG-OLED sets)
+can decode HEVC HDR10 natively, but not DV. So the file has to be
+transcoded DV → HDR10 first. The transcode itself is solved (libplacebo's
+`apply_dolbyvision=true` filter applies the RPU's IPT→BT.2020 reshape per
+frame). The unsolved part is *how to ship the result to the TV*.
+
+**What was attempted, transport by transport (Samsung S90F as the
+reference receiver — others may differ):**
+
+| Transport | What happens | Verdict |
+|---|---|---|
+| **AVKit AirPlay** (AVRoutePickerView/AVPlayer) | Session opens, TV shows "Connected to MacBook" banner, media never flows | Silent fail. Samsung's licensed AirPlay 2 SDK handshake doesn't engage with macOS AVKit reliably. Works fine for Apple TV. |
+| **libvlc chromecast renderer** (Cast V2) | VLC.app pushes successfully but its sout chain re-encodes HEVC HDR10 → H.264 SDR — wrong colors on TV. Fails entirely from our process despite identical libvlc + plugins + permissions; root cause never identified. | Cast V2 receivers re-encode regardless. Always lossy. |
+| **DLNA push, plain MP4 + faststart** | TV decodes HEVC HDR10 natively, correct colors. **But faststart requires a complete file** (final pass moves moov to start), so this is offline-only — full transcode finishes before push (~17 min for a 47-min file on M4). | Works for content, fails for UX. |
+| **DLNA push, fragmented MP4** (`+frag_keyframe+empty_moov+default_base_moof`) | TV connected, parsed headers, then displayed **"File format not supported"** on screen. | Rejected. Samsung's DLNA player doesn't accept fMP4. |
+| **DLNA push, MPEG-TS** (HEVC HDR10 in TS) | TV did HEAD only, then refused to issue GET. | Rejected on HEAD inspection. Samsung's TS decoder is reserved for broadcast/USB, not DLNA. |
+| **DLNA push, HLS** (.m3u8 + .ts segments) | Same as TS — TV did HEAD on the playlist, didn't follow up. | Rejected. HLS over DLNA isn't supported by Samsung's MediaRenderer. |
+
+**Empirical conclusion.** Samsung's DLNA path accepts *only* plain MP4
+with `moov` at the file start. That format inherently requires a finished
+transcode. Live streaming to this TV via DLNA is not possible.
+
+**What was removed when we shelved this:**
+- `Awesome Player/Player/HDRTranscoder.swift` — Subprocess wrapper that
+  spawned ffmpeg with libplacebo and parsed `-progress` output. Reusable
+  for any DV/HDR transcode need.
+- `Vendor/ffmpeg-cli/` — Self-contained ffmpeg sidecar (~34 MB): binary
+  built from FFmpeg 7.1 with `--enable-libplacebo --enable-videotoolbox`
+  + libplacebo + Vulkan loader + MoltenVK + lcms2 + shaderc + ICD JSON.
+  All dylibs `@rpath`-patched; binary rpath `@executable_path/../lib`.
+- `CastingHTTPServer.isLiveMode` + `CastingManager.castLive` — Live-mode
+  HTTP plumbing (advertised growing-file sizes, waited for bytes past
+  EOF). Never proved useful since Samsung rejected the live formats.
+- The DV-cast flow in `PlayerViewController` (transcode → DLNA picker →
+  push pipeline).
+
+**What was kept** (real bug fixes / generally useful):
+- All `DLNAManager` fixes (BSD-socket SSDP, `descriptionURL` from SSDP
+  LOCATION, walking `<service>` blocks for AVTransport, async-race in
+  `loadMedia`). These are bug fixes that benefit any DLNA usage.
+- DLNA headers in `CastingHTTPServer` (`transferMode.dlna.org`,
+  `contentFeatures.dlna.org`).
+- `CastButton` dual-mode (AVKit picker / custom NSButton). Useful any
+  time we need a custom AirPlay handler.
+- `AVPlayerEngine.allowsExternalPlayback` configurability.
+- Local DV playback path (remux to MP4 + `dvh1` tag + AVPlayer DV decoder).
+
+**Revival path** (if new tech or firmware enables this):
+
+1. Bring back `HDRTranscoder.swift` from git history (commit before this
+   was shelved). It's general infrastructure, no DV-only assumptions.
+2. Rebuild `Vendor/ffmpeg-cli/`: build FFmpeg 7.1 with
+   `--enable-libplacebo --enable-videotoolbox` against
+   `brew install libplacebo` (which pulls Vulkan loader + MoltenVK +
+   shaderc + lcms2). Patch install names with `install_name_tool` to
+   `@rpath`. Re-sign each binary with `codesign --force --sign -`. The
+   ICD JSON must live at `<bundle>/etc/vulkan/icd.d/MoltenVK_icd.json`
+   so its relative `../../../lib/libMoltenVK.dylib` path resolves; set
+   `VK_ICD_FILENAMES` env var before spawning ffmpeg.
+3. Restore `CastingHTTPServer.isLiveMode` and `CastingManager.castLive`
+   if doing live (but verify the receiver actually accepts the chosen
+   live format — the existing growing-file logic is correct in principle
+   but Samsung specifically rejected every live format we tried).
+4. Wire the DV-detect branch in `PlayerViewController.controlBarAirPlayRequested`
+   to launch the transcode + push flow instead of the "not supported" OSD.
+
+**Things that might change the landscape:**
+- Apple opens up an AirPlay 2 video sender API that handles Samsung's
+  handshake quirks. (Unlikely.)
+- Samsung firmware update accepts fMP4 or HLS via DLNA. (Possible —
+  worth re-testing periodically.)
+- An open-source AirPlay 2 video sender library matures on macOS.
+  (Worth watching the `pyatv` / `airpyle` ecosystem.)
+- We accept the offline transcode wait and ship it with a background
+  pre-transcode UX (start ffmpeg when DV file opens, finish before user
+  clicks AirPlay). Doable today without new tech; just deprioritized.
 
 ### DLNA discovery/control quirks (DLNAManager)
 
