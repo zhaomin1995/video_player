@@ -419,7 +419,7 @@ class PlayerViewController: NSViewController {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.playerEngine?.seekTo(time: savedPos)
                 self?.vlcEngine?.seekTo(time: savedPos)
-                self?.osdView.show(message: "Resumed from \(self?.formatSeekTime(savedPos) ?? "0:00")")
+                self?.osdView.show(message: String(format: L("Resumed from %@"), self?.formatSeekTime(savedPos) ?? "0:00"))
             }
         }
 
@@ -543,7 +543,7 @@ class PlayerViewController: NSViewController {
             controlBarView.setSpeed(Float(speed))
         }
         controlBarView.setAirPlayAvailable(true)
-        osdView.show(message: "Preparing Dolby Vision playback…", duration: 60.0)
+        osdView.show(message: L("Preparing Dolby Vision playback…"), duration: 60.0)
         remuxAndPlay(engine: engine, url: url)
         loadEmbeddedSubtitlesIfNeeded(url: url)
     }
@@ -554,7 +554,7 @@ class PlayerViewController: NSViewController {
         engine.delegate = self
 
         guard engine.open(url: url) else {
-            osdView.show(message: "Failed to open file")
+            osdView.show(message: L("Failed to open file"))
             return
         }
 
@@ -605,7 +605,7 @@ class PlayerViewController: NSViewController {
             if let srtText = try? FFmpegBridge.extractSubtitleTrack(Int32(index), fromFile: url.path) {
                 DispatchQueue.main.async {
                     self?.subtitleManager.loadSubtitleFromSRTText(srtText)
-                    self?.osdView.show(message: "Embedded subtitles loaded")
+                    self?.osdView.show(message: L("Embedded subtitles loaded"))
                 }
             }
         }
@@ -641,7 +641,7 @@ class PlayerViewController: NSViewController {
             engine.play()
             controlBarView.setPlaying(true)
         } else {
-            showOSD("Failed to open stream")
+            showOSD(L("Failed to open stream"))
         }
     }
 
@@ -693,7 +693,7 @@ class PlayerViewController: NSViewController {
         // of AVKit AirPlay since Samsung receivers don't decode DV via AVKit.
         let allowsExternal = engine.allowsExternalPlayback
         DispatchQueue.main.async {
-            self.osdView.show(message: "Loading…", duration: 10.0)
+            self.osdView.show(message: L("Loading…"), duration: 10.0)
         }
         let fullURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString + "_full")
@@ -709,7 +709,7 @@ class PlayerViewController: NSViewController {
                     newEngine.delegate = self
                     self.playWithEngine(newEngine, url: fullURL)
                 } else {
-                    self.osdView.show(message: "Failed to open file")
+                    self.osdView.show(message: L("Failed to open file"))
                 }
             }
         }
@@ -717,12 +717,12 @@ class PlayerViewController: NSViewController {
 
     func togglePlayPause() {
         if let engine = playerEngine {
-            if engine.isPlaying { engine.pause(); osdView.show(message: "Paused") }
-            else { engine.play(); osdView.show(message: "Playing") }
+            if engine.isPlaying { engine.pause(); osdView.show(message: L("Paused")) }
+            else { engine.play(); osdView.show(message: L("Playing")) }
             controlBarView.setPlaying(engine.isPlaying)
         } else if let engine = vlcEngine {
-            if engine.isPlaying { engine.pause(); osdView.show(message: "Paused") }
-            else { engine.play(); osdView.show(message: "Playing") }
+            if engine.isPlaying { engine.pause(); osdView.show(message: L("Paused")) }
+            else { engine.play(); osdView.show(message: L("Playing")) }
             controlBarView.setPlaying(engine.isPlaying)
         }    }
 
@@ -742,7 +742,7 @@ class PlayerViewController: NSViewController {
         let pct = dur > 0 ? Int(expectedTime / dur * 100) : 0
         let cur = formatSeekTime(expectedTime)
         let total = formatSeekTime(dur)
-        osdView.show(message: "Seek to \(cur) / \(total) (\(pct)%)")
+        osdView.show(message: String(format: L("Seek to %@ / %@ (%d%%)"), cur, total, pct))
     }
 
     private func formatSeekTime(_ seconds: Double) -> String {
@@ -772,11 +772,11 @@ class PlayerViewController: NSViewController {
         if let engine = playerEngine {
             engine.isMuted.toggle()
             controlBarView.setMuted(engine.isMuted)
-            osdView.show(message: engine.isMuted ? "Muted" : "Unmuted")
+            osdView.show(message: engine.isMuted ? L("Muted") : L("Unmuted"))
         } else if let engine = vlcEngine {
             engine.isMuted.toggle()
             controlBarView.setMuted(engine.isMuted)
-            osdView.show(message: engine.isMuted ? "Muted" : "Unmuted")
+            osdView.show(message: engine.isMuted ? L("Muted") : L("Unmuted"))
         }    }
 
     func adjustSpeed(by delta: Float) {
@@ -792,7 +792,7 @@ class PlayerViewController: NSViewController {
         playerEngine?.rate = speed
         vlcEngine?.rate = speed
         controlBarView.setSpeed(speed)
-        osdView.show(message: String(format: "Speed: %.2fx", speed))
+        osdView.show(message: String(format: L("Speed: %.2fx"), speed))
     }
 
     func showControlBar(animated: Bool) {
@@ -832,27 +832,27 @@ class PlayerViewController: NSViewController {
 
     func loadSubtitleFile(_ url: URL) {
         subtitleManager.loadSubtitle(from: url)
-        osdView.show(message: "Subtitle loaded: \(url.lastPathComponent)")
+        osdView.show(message: String(format: L("Subtitle loaded: %@"), url.lastPathComponent))
     }
 
     func toggleSubtitleVisibility() {
         subtitleManager.toggleVisibility()
         if subtitleManager.isVisible {
-            osdView.show(message: "Subtitles visible")
+            osdView.show(message: L("Subtitles visible"))
         } else {
             subtitleOverlayView.setText(nil)
-            osdView.show(message: "Subtitles hidden")
+            osdView.show(message: L("Subtitles hidden"))
         }
     }
 
     func adjustSubtitleDelay(by delta: Double) {
         subtitleManager.adjustDelay(by: delta)
-        osdView.show(message: String(format: "Subtitle delay: %.1fs", subtitleManager.delay))
+        osdView.show(message: String(format: L("Subtitle delay: %.1fs"), subtitleManager.delay))
     }
 
     func resetSubtitleDelay() {
         subtitleManager.delay = 0
-        osdView.show(message: "Subtitle delay reset")
+        osdView.show(message: L("Subtitle delay reset"))
     }
 
     // MARK: - Screenshot
@@ -873,14 +873,14 @@ class PlayerViewController: NSViewController {
             let filename = "Awesome Player \(formatter.string(from: Date())).png"
             let path = dir.appendingPathComponent(filename).path
             if vlc.takeSnapshot(path: path) {
-                osdView.show(message: "Screenshot saved")
+                osdView.show(message: L("Screenshot saved"))
             } else {
-                osdView.show(message: "Screenshot failed")
+                osdView.show(message: L("Screenshot failed"))
             }
             return
         }
         guard let player = playerEngine?.player, let item = player.currentItem else {
-            osdView.show(message: "No video playing")
+            osdView.show(message: L("No video playing"))
             return
         }
         let time = player.currentTime()
@@ -891,7 +891,7 @@ class PlayerViewController: NSViewController {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var actualTime = CMTime.zero
             guard let cgImage = try? generator.copyCGImage(at: time, actualTime: &actualTime) else {
-                DispatchQueue.main.async { self?.osdView.show(message: "Screenshot failed") }
+                DispatchQueue.main.async { self?.osdView.show(message: L("Screenshot failed")) }
                 return
             }
             let rep = NSBitmapImageRep(cgImage: cgImage)
@@ -916,7 +916,7 @@ class PlayerViewController: NSViewController {
             formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
             let filename = "Awesome Player \(formatter.string(from: Date())).\(ext)"
             try? data.write(to: dir.appendingPathComponent(filename))
-            DispatchQueue.main.async { self?.osdView.show(message: "Screenshot saved to \(dirName)") }
+            DispatchQueue.main.async { self?.osdView.show(message: String(format: L("Screenshot saved to %@"), dirName)) }
         }
     }
 
@@ -925,7 +925,7 @@ class PlayerViewController: NSViewController {
     func seekToAbsoluteTime(_ seconds: Double) {
         playerEngine?.seekTo(time: seconds)
         vlcEngine?.seekTo(time: seconds)
-        osdView.show(message: "Jump to \(formatSeekTime(seconds))")
+        osdView.show(message: String(format: L("Jump to %@"), formatSeekTime(seconds)))
     }
 
     func toggleABLoop() {
@@ -941,11 +941,11 @@ class PlayerViewController: NSViewController {
         abLoopController.toggle(currentTime: cmTime)
         switch abLoopController.state {
         case .inactive:
-            osdView.show(message: "A-B Loop cleared")
+            osdView.show(message: L("A-B Loop cleared"))
         case .settingA:
-            osdView.show(message: "A point set")
+            osdView.show(message: L("A point set"))
         case .active:
-            osdView.show(message: "A-B Loop active")
+            osdView.show(message: L("A-B Loop active"))
         }
     }
 
@@ -953,26 +953,26 @@ class PlayerViewController: NSViewController {
 
     func setVideoWindowSize(scale: CGFloat) {
         guard let window = view.window, let videoSize = playerEngine?.videoSize ?? vlcEngine?.videoSize else {
-            osdView.show(message: "No video loaded")
+            osdView.show(message: L("No video loaded"))
             return
         }
         let newSize = NSSize(width: videoSize.width * scale, height: videoSize.height * scale)
         window.setContentSize(newSize)
         window.center()
-        osdView.show(message: scale == 1 ? "Original size" : String(format: "%.0f%% size", scale * 100))
+        osdView.show(message: scale == 1 ? L("Original size") : String(format: L("%.0f%% size"), scale * 100))
     }
 
     func fitWindowToScreen() {
         guard let window = view.window, let screen = window.screen ?? NSScreen.main else { return }
         let frame = screen.visibleFrame
         window.setFrame(frame, display: true, animate: true)
-        osdView.show(message: "Fit to screen")
+        osdView.show(message: L("Fit to screen"))
     }
 
     func toggleFillScreen() {
         isFillScreen.toggle()
         videoView.setVideoGravity(isFillScreen ? .resizeAspectFill : .resizeAspect)
-        osdView.show(message: isFillScreen ? "Fill screen" : "Fit to screen")
+        osdView.show(message: isFillScreen ? L("Fill screen") : L("Fit to screen"))
     }
 
     func setAspectRatio(_ name: String) {
@@ -987,7 +987,7 @@ class PlayerViewController: NSViewController {
             window.resizeIncrements = NSSize(width: 1, height: 1)
             window.contentAspectRatio = NSSize(width: 0, height: 0)
         }
-        osdView.show(message: "Aspect ratio: \(name)")
+        osdView.show(message: String(format: L("Aspect ratio: %@"), name))
     }
 
     func rotateVideo(by degrees: CGFloat) {
@@ -995,7 +995,7 @@ class PlayerViewController: NSViewController {
         if videoRotation >= 360 { videoRotation -= 360 }
         if videoRotation < 0 { videoRotation += 360 }
         updateVideoTransform()
-        osdView.show(message: "Rotate: \(Int(videoRotation))°")
+        osdView.show(message: String(format: L("Rotate: %d°"), Int(videoRotation)))
     }
 
     func flipVideo(horizontal: Bool) {
@@ -1005,7 +1005,7 @@ class PlayerViewController: NSViewController {
             videoFlippedV.toggle()
         }
         updateVideoTransform()
-        osdView.show(message: horizontal ? "Flip horizontal" : "Flip vertical")
+        osdView.show(message: horizontal ? L("Flip horizontal") : L("Flip vertical"))
     }
 
     func revertVideoTransform() {
@@ -1013,7 +1013,7 @@ class PlayerViewController: NSViewController {
         videoFlippedH = false
         videoFlippedV = false
         updateVideoTransform()
-        osdView.show(message: "Transform reset")
+        osdView.show(message: L("Transform reset"))
     }
 
     private func updateVideoTransform() {
@@ -1031,7 +1031,7 @@ class PlayerViewController: NSViewController {
             pipController = AVPictureInPictureController(playerLayer: layer)
         }
         guard let pip = pipController else {
-            osdView.show(message: "PiP not available")
+            osdView.show(message: L("PiP not available"))
             return
         }
         if pip.isPictureInPictureActive {
@@ -1047,11 +1047,11 @@ class PlayerViewController: NSViewController {
         if let engine = playerEngine {
             engine.stepFrame(forward: forward)
             controlBarView.setPlaying(false)
-            osdView.show(message: forward ? "Frame ▶" : "◀ Frame")
+            osdView.show(message: forward ? L("Frame ▶") : L("◀ Frame"))
         } else if let engine = vlcEngine, forward {
             engine.stepFrame()
             controlBarView.setPlaying(false)
-            osdView.show(message: "Frame ▶")
+            osdView.show(message: L("Frame ▶"))
         }
     }
 
@@ -1063,7 +1063,7 @@ class PlayerViewController: NSViewController {
         let title = chapters[index]["title"] as? String ?? "Chapter \(index + 1)"
         playerEngine?.seekTo(time: startTime)
         vlcEngine?.seekTo(time: startTime)
-        osdView.show(message: "Chapter: \(title)")
+        osdView.show(message: String(format: L("Chapter: %@"), title))
     }
 
     func seekToNextChapter() {
@@ -1071,7 +1071,7 @@ class PlayerViewController: NSViewController {
         if let next = chapters.firstIndex(where: { ($0["startTime"] as? Double ?? 0) > current + 1 }) {
             seekToChapter(at: next)
         } else {
-            osdView.show(message: "No next chapter")
+            osdView.show(message: L("No next chapter"))
         }
     }
 
@@ -1083,7 +1083,7 @@ class PlayerViewController: NSViewController {
         } else if !chapters.isEmpty {
             seekToChapter(at: 0)
         } else {
-            osdView.show(message: "No previous chapter")
+            osdView.show(message: L("No previous chapter"))
         }
     }
 
@@ -1098,13 +1098,13 @@ class PlayerViewController: NSViewController {
     func adjustAudioDelay(by delta: Double) {
         audioDelayOffset += delta
         vlcEngine?.setAudioDelay(seconds: audioDelayOffset)
-        osdView.show(message: String(format: "Audio delay: %+.1fs", audioDelayOffset))
+        osdView.show(message: String(format: L("Audio delay: %+.1fs"), audioDelayOffset))
     }
 
     func resetAudioDelay() {
         audioDelayOffset = 0
         vlcEngine?.setAudioDelay(seconds: 0)
-        osdView.show(message: "Audio delay reset")
+        osdView.show(message: L("Audio delay reset"))
     }
 
     // MARK: - Playlist Panel
@@ -1143,17 +1143,17 @@ class PlayerViewController: NSViewController {
 
     func setRepeatMode(_ mode: RepeatMode) {
         playlistManager.repeatMode = mode
-        osdView.show(message: "Repeat: \(mode.rawValue)")
+        osdView.show(message: String(format: L("Repeat: %@"), mode.rawValue))
     }
 
     func toggleShuffle() {
         playlistManager.shuffle.toggle()
-        osdView.show(message: playlistManager.shuffle ? "Shuffle on" : "Shuffle off")
+        osdView.show(message: playlistManager.shuffle ? L("Shuffle on") : L("Shuffle off"))
     }
 
     func playNextTrack() {
         guard let url = playlistManager.next() else {
-            osdView.show(message: "No next track")
+            osdView.show(message: L("No next track"))
             return
         }
         onFileDropped?(url)
@@ -1161,7 +1161,7 @@ class PlayerViewController: NSViewController {
 
     func playPreviousTrack() {
         guard let url = playlistManager.previous() else {
-            osdView.show(message: "No previous track")
+            osdView.show(message: L("No previous track"))
             return
         }
         onFileDropped?(url)
@@ -1186,7 +1186,7 @@ extension PlayerViewController: ControlBarDelegate {
     func controlBarVolumeChanged(to volume: Float) {
         playerEngine?.volume = volume
         vlcEngine?.volume = volume
-        osdView.show(message: "Volume: \(Int(volume * 100))%")
+        osdView.show(message: String(format: L("Volume: %d%%"), Int(volume * 100)))
     }
 
     func controlBarSpeedChanged(to speed: Float) {
@@ -1222,7 +1222,7 @@ extension PlayerViewController: ControlBarDelegate {
         // See CLAUDE.md "Dolby Vision casting (currently unsupported)" for
         // the full investigation and revival path.
         if playerEngine != nil, currentFileIsDolbyVision {
-            osdView.show(message: "Casting Dolby Vision isn't supported. Play locally instead.", duration: 4.0)
+            osdView.show(message: L("Casting Dolby Vision isn't supported. Play locally instead."), duration: 4.0)
             return
         }
 
@@ -1234,7 +1234,7 @@ extension PlayerViewController: ControlBarDelegate {
         guard let vlc = vlcEngine else { return }
         let renderers = vlc.discoveredRenderers
         if renderers.isEmpty {
-            osdView.show(message: "Searching for devices…", duration: 3.0)
+            osdView.show(message: L("Searching for devices…"), duration: 3.0)
             vlc.startRendererDiscovery()
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
                 guard let self = self, let vlc = self.vlcEngine else { return }
@@ -1247,7 +1247,7 @@ extension PlayerViewController: ControlBarDelegate {
 
     private func showRendererMenu(renderers: [VLCPlayerEngine.RendererInfo]) {
         if renderers.isEmpty {
-            osdView.show(message: "No devices found", duration: 3.0)
+            osdView.show(message: L("No devices found"), duration: 3.0)
             return
         }
 
@@ -1346,9 +1346,9 @@ extension PlayerViewController: AVPlayerEngineDelegate {
 
     func playerEngineExternalPlaybackChanged(isActive: Bool) {
         if isActive {
-            osdView.show(message: "AirPlay: Playing on TV", duration: 3.0)
+            osdView.show(message: L("AirPlay: Playing on TV"), duration: 3.0)
         } else {
-            osdView.show(message: "AirPlay: Local playback")
+            osdView.show(message: L("AirPlay: Local playback"))
         }
     }
 
@@ -1358,7 +1358,7 @@ extension PlayerViewController: AVPlayerEngineDelegate {
     func moveToExternalDisplay() {
         guard let window = view.window else { return }
         guard let externalScreen = NSScreen.screens.first(where: { $0 != NSScreen.main }) else {
-            osdView.show(message: "No external display found — add one via System Settings > Displays", duration: 3.0)
+            osdView.show(message: L("No external display found — add one via System Settings > Displays"), duration: 3.0)
             return
         }
         window.setFrame(externalScreen.frame, display: true, animate: true)
@@ -1430,9 +1430,9 @@ extension PlayerViewController: VLCPlayerEngineDelegate {
 extension PlayerViewController: AudioPassthroughManagerDelegate {
     func passthroughStateChanged(isActive: Bool, deviceName: String?) {
         if isActive {
-            osdView.show(message: "Passthrough: ON (\(deviceName ?? "Unknown"))")
+            osdView.show(message: String(format: L("Passthrough: ON (%@)"), deviceName ?? L("Unknown")))
         } else {
-            osdView.show(message: "Passthrough: OFF")
+            osdView.show(message: L("Passthrough: OFF"))
         }
     }
 

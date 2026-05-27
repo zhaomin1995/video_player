@@ -7,7 +7,7 @@ class VideoEQPanelController: NSWindowController {
         let window = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 300, height: 280),
                             styleMask: [.titled, .closable, .utilityWindow],
                             backing: .buffered, defer: false)
-        window.title = "Video Equalizer"
+        window.title = L("Video Equalizer")
         window.isFloatingPanel = true
         window.becomesKeyOnlyIfNeeded = true
         super.init(window: window)
@@ -48,7 +48,7 @@ class VideoEQPanelController: NSWindowController {
             stack.addArrangedSubview(row)
         }
 
-        let resetBtn = NSButton(title: "Reset", target: self, action: #selector(resetAll))
+        let resetBtn = NSButton(title: L("Reset"), target: self, action: #selector(resetAll))
         resetBtn.bezelStyle = .rounded
         stack.addArrangedSubview(resetBtn)
 

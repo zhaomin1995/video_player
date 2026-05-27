@@ -76,7 +76,7 @@ class AudioDeviceMenuDelegate: NSObject, NSMenuDelegate {
         }
 
         if menu.items.isEmpty {
-            let none = NSMenuItem(title: "No devices found", action: nil, keyEquivalent: "")
+            let none = NSMenuItem(title: L("No devices found"), action: nil, keyEquivalent: "")
             none.isEnabled = false
             menu.addItem(none)
         }
@@ -107,7 +107,7 @@ class AirPlayMenuDelegate: NSObject, NSMenuDelegate, NetServiceBrowserDelegate, 
         menu.removeAllItems()
 
         if resolvedDevices.isEmpty {
-            let scanning = NSMenuItem(title: "Scanning…", action: nil, keyEquivalent: "")
+            let scanning = NSMenuItem(title: L("Scanning…"), action: nil, keyEquivalent: "")
             scanning.isEnabled = false
             menu.addItem(scanning)
             // Restart discovery in case it timed out
@@ -164,7 +164,7 @@ class ChromecastMenuDelegate: NSObject, NSMenuDelegate, NetServiceBrowserDelegat
         menu.removeAllItems()
 
         if resolvedDevices.isEmpty {
-            let scanning = NSMenuItem(title: "Scanning…", action: nil, keyEquivalent: "")
+            let scanning = NSMenuItem(title: L("Scanning…"), action: nil, keyEquivalent: "")
             scanning.isEnabled = false
             menu.addItem(scanning)
             startDiscovery()
@@ -251,7 +251,7 @@ class RecentDocumentsMenuDelegate: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let paths = UserDefaults.standard.stringArray(forKey: Self.key) ?? []
         if paths.isEmpty {
-            let none = NSMenuItem(title: "(No Recent Files)", action: nil, keyEquivalent: "")
+            let none = NSMenuItem(title: L("(No Recent Files)"), action: nil, keyEquivalent: "")
             none.isEnabled = false
             menu.addItem(none)
         } else {
@@ -263,7 +263,7 @@ class RecentDocumentsMenuDelegate: NSObject, NSMenuDelegate {
             }
         }
         menu.addItem(.separator())
-        let clearItem = menu.addItem(withTitle: "Clear Menu", action: #selector(clearRecent(_:)), keyEquivalent: "")
+        let clearItem = menu.addItem(withTitle: L("Clear Menu"), action: #selector(clearRecent(_:)), keyEquivalent: "")
         clearItem.target = self
     }
 
@@ -386,7 +386,7 @@ class TrackMenuDelegate: NSObject, NSMenuDelegate {
     }
 
     private func addNoneItem(to menu: NSMenu) {
-        let item = NSMenuItem(title: "(None)", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: L("(None)"), action: nil, keyEquivalent: "")
         item.isEnabled = false
         menu.addItem(item)
     }
@@ -430,7 +430,7 @@ class ChapterMenuDelegate: NSObject, NSMenuDelegate {
     }
 
     private func addNoneItem(to menu: NSMenu) {
-        let item = NSMenuItem(title: "(No Chapters)", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: L("(No Chapters)"), action: nil, keyEquivalent: "")
         item.isEnabled = false
         menu.addItem(item)
     }
@@ -450,12 +450,12 @@ class ChapterMenuDelegate: NSObject, NSMenuDelegate {
 class PlaybackSpeedSliderView: NSView {
     static let shared = PlaybackSpeedSliderView()
 
-    private let titleLabel = NSTextField(labelWithString: "Playback Speed")
+    private let titleLabel = NSTextField(labelWithString: L("Playback Speed"))
     private let valueLabel = NSTextField(labelWithString: "1.00x")
     private let slider = NSSlider()
-    private let slowerLabel = NSTextField(labelWithString: "Slower")
-    private let normalLabel = NSTextField(labelWithString: "Normal")
-    private let fasterLabel = NSTextField(labelWithString: "Faster")
+    private let slowerLabel = NSTextField(labelWithString: L("Slower"))
+    private let normalLabel = NSTextField(labelWithString: L("Normal"))
+    private let fasterLabel = NSTextField(labelWithString: L("Faster"))
 
     init() {
         super.init(frame: NSRect(x: 0, y: 0, width: 320, height: 64))
@@ -544,7 +544,7 @@ class PlaybackMenuDelegate: NSObject, NSMenuDelegate {
 class SubtitleOpacitySliderView: NSView {
     static let shared = SubtitleOpacitySliderView()
 
-    private let titleLabel = NSTextField(labelWithString: "Background Opacity")
+    private let titleLabel = NSTextField(labelWithString: L("Background Opacity"))
     private let slider = NSSlider()
 
     init() {
@@ -619,87 +619,87 @@ class MenuManager {
         let menuItem = NSMenuItem()
         let menu = NSMenu()
 
-        menu.addItem(withTitle: "About Awesome Player", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("About Awesome Player"), action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Preferences…", action: #selector(AppDelegate.showPreferences(_:)), keyEquivalent: ",")
+        menu.addItem(withTitle: L("Preferences…"), action: #selector(AppDelegate.showPreferences(_:)), keyEquivalent: ",")
         menu.addItem(.separator())
-        let services = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
-        let servicesMenu = NSMenu(title: "Services")
+        let services = NSMenuItem(title: L("Services"), action: nil, keyEquivalent: "")
+        let servicesMenu = NSMenu(title: L("Services"))
         services.submenu = servicesMenu
         NSApplication.shared.servicesMenu = servicesMenu
         menu.addItem(services)
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Hide Awesome Player", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        let hideOthers = menu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        menu.addItem(withTitle: L("Hide Awesome Player"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = menu.addItem(withTitle: L("Hide Others"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
-        menu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Show All"), action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit Awesome Player", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: L("Quit Awesome Player"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         menuItem.submenu = menu
         return menuItem
     }
 
     private static func createEditMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Edit")
+        let menuItem = NSMenuItem(title: L("Edit"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("Edit"))
 
-        menu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
-        menu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        menu.addItem(withTitle: L("Undo"), action: Selector(("undo:")), keyEquivalent: "z")
+        menu.addItem(withTitle: L("Redo"), action: Selector(("redo:")), keyEquivalent: "Z")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        menu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        menu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        menu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        menu.addItem(withTitle: L("Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        menu.addItem(withTitle: L("Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        menu.addItem(withTitle: L("Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        menu.addItem(withTitle: L("Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
         menuItem.submenu = menu
         return menuItem
     }
 
     private static func createFileMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "File")
+        let menuItem = NSMenuItem(title: L("File"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("File"))
 
-        menu.addItem(withTitle: "Open File…", action: #selector(AppDelegate.openFileAction(_:)), keyEquivalent: "o")
-        menu.addItem(withTitle: "Open URL…", action: #selector(AppDelegate.openURL(_:)), keyEquivalent: "u")
+        menu.addItem(withTitle: L("Open File…"), action: #selector(AppDelegate.openFileAction(_:)), keyEquivalent: "o")
+        menu.addItem(withTitle: L("Open URL…"), action: #selector(AppDelegate.openURL(_:)), keyEquivalent: "u")
 
-        let recentItem = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
-        let recentMenu = NSMenu(title: "Open Recent")
+        let recentItem = NSMenuItem(title: L("Open Recent"), action: nil, keyEquivalent: "")
+        let recentMenu = NSMenu(title: L("Open Recent"))
         recentMenu.delegate = RecentDocumentsMenuDelegate.shared
         recentItem.submenu = recentMenu
         menu.addItem(recentItem)
 
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Add Subtitle File…", action: #selector(AppDelegate.addSubtitleFile(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Add Subtitle File…"), action: #selector(AppDelegate.addSubtitleFile(_:)), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Save Screenshot", action: #selector(AppDelegate.saveScreenshot(_:)), keyEquivalent: "s")
+        menu.addItem(withTitle: L("Save Screenshot"), action: #selector(AppDelegate.saveScreenshot(_:)), keyEquivalent: "s")
         menu.addItem(.separator())
-        let convertItem = menu.addItem(withTitle: "Convert / Stream…",
+        let convertItem = menu.addItem(withTitle: L("Convert / Stream…"),
             action: #selector(AppDelegate.showConvertStream(_:)), keyEquivalent: "s")
         convertItem.keyEquivalentModifierMask = [.shift, .command]
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Close", action: #selector(NSWindow.close), keyEquivalent: "w")
+        menu.addItem(withTitle: L("Close"), action: #selector(NSWindow.close), keyEquivalent: "w")
 
         menuItem.submenu = menu
         return menuItem
     }
 
     private static func createPlaybackMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "Playback", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Playback")
+        let menuItem = NSMenuItem(title: L("Playback"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("Playback"))
         // Delegate refreshes the speed slider value from live playback rate on open
         menu.delegate = PlaybackMenuDelegate.shared
 
-        menu.addItem(withTitle: "Play / Pause", action: #selector(AppDelegate.togglePlayPause(_:)), keyEquivalent: " ")
+        menu.addItem(withTitle: L("Play / Pause"), action: #selector(AppDelegate.togglePlayPause(_:)), keyEquivalent: " ")
 
         menu.addItem(.separator())
-        let seekFwd = menu.addItem(withTitle: "Seek Forward 5s", action: #selector(AppDelegate.seekForward5(_:)), keyEquivalent: String(Character(UnicodeScalar(NSRightArrowFunctionKey)!)))
+        let seekFwd = menu.addItem(withTitle: L("Seek Forward 5s"), action: #selector(AppDelegate.seekForward5(_:)), keyEquivalent: String(Character(UnicodeScalar(NSRightArrowFunctionKey)!)))
         seekFwd.keyEquivalentModifierMask = []
-        let seekBwd = menu.addItem(withTitle: "Seek Backward 5s", action: #selector(AppDelegate.seekBackward5(_:)), keyEquivalent: String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!)))
+        let seekBwd = menu.addItem(withTitle: L("Seek Backward 5s"), action: #selector(AppDelegate.seekBackward5(_:)), keyEquivalent: String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!)))
         seekBwd.keyEquivalentModifierMask = []
 
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Jump to Time…", action: #selector(AppDelegate.jumpToTime(_:)), keyEquivalent: "j")
+        menu.addItem(withTitle: L("Jump to Time…"), action: #selector(AppDelegate.jumpToTime(_:)), keyEquivalent: "j")
 
         menu.addItem(.separator())
         // VLC-style inline speed slider (continuous 0.25× to 4×, log scale)
@@ -708,8 +708,8 @@ class MenuManager {
         menu.addItem(speedSliderItem)
 
         // Keep discrete presets for users who prefer click-to-set
-        let speedMenu = NSMenuItem(title: "Speed Presets", action: nil, keyEquivalent: "")
-        let speedSubmenu = NSMenu(title: "Speed Presets")
+        let speedMenu = NSMenuItem(title: L("Speed Presets"), action: nil, keyEquivalent: "")
+        let speedSubmenu = NSMenu(title: L("Speed Presets"))
         for speed in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0] {
             let item = speedSubmenu.addItem(withTitle: String(format: "%.2gx", speed), action: #selector(AppDelegate.setSpeed(_:)), keyEquivalent: "")
             if speed == 1.0 { item.state = .on }
@@ -718,11 +718,11 @@ class MenuManager {
         menu.addItem(speedMenu)
 
         menu.addItem(.separator())
-        menu.addItem(withTitle: "A-B Repeat", action: #selector(AppDelegate.toggleABRepeat(_:)), keyEquivalent: "r")
+        menu.addItem(withTitle: L("A-B Repeat"), action: #selector(AppDelegate.toggleABRepeat(_:)), keyEquivalent: "r")
 
         menu.addItem(.separator())
-        let chapterItem = NSMenuItem(title: "Chapter", action: nil, keyEquivalent: "")
-        let chapterSubmenu = NSMenu(title: "Chapter")
+        let chapterItem = NSMenuItem(title: L("Chapter"), action: nil, keyEquivalent: "")
+        let chapterSubmenu = NSMenu(title: L("Chapter"))
         chapterSubmenu.delegate = ChapterMenuDelegate.shared
         chapterItem.submenu = chapterSubmenu
         menu.addItem(chapterItem)
@@ -732,12 +732,12 @@ class MenuManager {
     }
 
     private static func createAudioMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "Audio", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Audio")
+        let menuItem = NSMenuItem(title: L("Audio"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("Audio"))
 
         // Tracks section (dynamically populated)
-        let tracksItem = NSMenuItem(title: "Audio Track", action: nil, keyEquivalent: "")
-        let tracksSubmenu = NSMenu(title: "Audio Track")
+        let tracksItem = NSMenuItem(title: L("Audio Track"), action: nil, keyEquivalent: "")
+        let tracksSubmenu = NSMenu(title: L("Audio Track"))
         tracksSubmenu.delegate = TrackMenuDelegate.audio
         tracksItem.submenu = tracksSubmenu
         menu.addItem(tracksItem)
@@ -746,11 +746,11 @@ class MenuManager {
         // Equalizer submenu — 23 presets matching Movist Pro's set, all 10-band
         // custom EQ values (see AudioEqualizerPreset.all in VLCPlayerEngine.swift).
         // Index 0 = Off (disables EQ), 1..N = preset array index + 1.
-        let eqItem = NSMenuItem(title: "Equalizer", action: nil, keyEquivalent: "")
-        let eqMenu = NSMenu(title: "Equalizer")
+        let eqItem = NSMenuItem(title: L("Equalizer"), action: nil, keyEquivalent: "")
+        let eqMenu = NSMenu(title: L("Equalizer"))
         let currentEQ = UserDefaults.standard.integer(forKey: Defaults.defaultEQPreset)
 
-        let offItem = eqMenu.addItem(withTitle: "Off",
+        let offItem = eqMenu.addItem(withTitle: L("Off"),
             action: #selector(AppDelegate.setEQPreset(_:)), keyEquivalent: "")
         offItem.tag = 0
         if currentEQ == 0 { offItem.state = .on }
@@ -758,7 +758,9 @@ class MenuManager {
 
         for (i, preset) in AudioEqualizerPreset.all.enumerated() {
             let idx = i + 1
-            let item = eqMenu.addItem(withTitle: preset.name,
+            // EQ preset names are proper names ("Bass Booster", "R&B", etc.)
+            // and have established translations; let them flow through L().
+            let item = eqMenu.addItem(withTitle: L(preset.name),
                 action: #selector(AppDelegate.setEQPreset(_:)), keyEquivalent: "")
             item.tag = idx
             if idx == currentEQ { item.state = .on }
@@ -767,64 +769,67 @@ class MenuManager {
         menu.addItem(eqItem)
 
         // Output Device submenu
-        let deviceItem = NSMenuItem(title: "Output Device", action: nil, keyEquivalent: "")
-        let deviceMenu = NSMenu(title: "Output Device")
+        let deviceItem = NSMenuItem(title: L("Output Device"), action: nil, keyEquivalent: "")
+        let deviceMenu = NSMenu(title: L("Output Device"))
         deviceMenu.delegate = AudioDeviceMenuDelegate.shared
         deviceItem.submenu = deviceMenu
         menu.addItem(deviceItem)
         menu.addItem(.separator())
 
         // Sync section
-        let syncHeader = NSMenuItem(title: "Sync.", action: nil, keyEquivalent: "")
+        let syncHeader = NSMenuItem(title: L("Sync."), action: nil, keyEquivalent: "")
         syncHeader.isEnabled = false
         menu.addItem(syncHeader)
-        menu.addItem(withTitle: "Pull", action: #selector(AppDelegate.audioSyncPull(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Push", action: #selector(AppDelegate.audioSyncPush(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Revert Sync.", action: #selector(AppDelegate.audioSyncRevert(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Pull"), action: #selector(AppDelegate.audioSyncPull(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Push"), action: #selector(AppDelegate.audioSyncPush(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Revert Sync."), action: #selector(AppDelegate.audioSyncRevert(_:)), keyEquivalent: "")
         menu.addItem(.separator())
 
         // Volume section
-        let volUp = menu.addItem(withTitle: "Increase Volume", action: #selector(AppDelegate.volumeUp(_:)), keyEquivalent: String(Character(UnicodeScalar(NSUpArrowFunctionKey)!)))
+        let volUp = menu.addItem(withTitle: L("Increase Volume"), action: #selector(AppDelegate.volumeUp(_:)), keyEquivalent: String(Character(UnicodeScalar(NSUpArrowFunctionKey)!)))
         volUp.keyEquivalentModifierMask = []
-        let volDown = menu.addItem(withTitle: "Decrease Volume", action: #selector(AppDelegate.volumeDown(_:)), keyEquivalent: String(Character(UnicodeScalar(NSDownArrowFunctionKey)!)))
+        let volDown = menu.addItem(withTitle: L("Decrease Volume"), action: #selector(AppDelegate.volumeDown(_:)), keyEquivalent: String(Character(UnicodeScalar(NSDownArrowFunctionKey)!)))
         volDown.keyEquivalentModifierMask = []
-        menu.addItem(withTitle: "Mute", action: #selector(AppDelegate.toggleMute(_:)), keyEquivalent: "m")
+        menu.addItem(withTitle: L("Mute"), action: #selector(AppDelegate.toggleMute(_:)), keyEquivalent: "m")
 
         menuItem.submenu = menu
         return menuItem
     }
 
     private static func createVideoMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "Video", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Video")
+        let menuItem = NSMenuItem(title: L("Video"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("Video"))
 
         // Tracks section (dynamically populated)
-        let tracksItem = NSMenuItem(title: "Video Track", action: nil, keyEquivalent: "")
-        let tracksSubmenu = NSMenu(title: "Video Track")
+        let tracksItem = NSMenuItem(title: L("Video Track"), action: nil, keyEquivalent: "")
+        let tracksSubmenu = NSMenu(title: L("Video Track"))
         tracksSubmenu.delegate = TrackMenuDelegate.video
         tracksItem.submenu = tracksSubmenu
         menu.addItem(tracksItem)
         menu.addItem(.separator())
 
         // Full Screen & PiP
-        menu.addItem(withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "\r")
-        menu.addItem(withTitle: "Picture in Picture", action: #selector(AppDelegate.togglePiP(_:)), keyEquivalent: "p")
+        menu.addItem(withTitle: L("Enter Full Screen"), action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "\r")
+        menu.addItem(withTitle: L("Picture in Picture"), action: #selector(AppDelegate.togglePiP(_:)), keyEquivalent: "p")
         menu.addItem(.separator())
 
         // Size
-        menu.addItem(withTitle: "Half Size", action: #selector(AppDelegate.setHalfSize(_:)), keyEquivalent: "`")
-        menu.addItem(withTitle: "Actual Size", action: #selector(AppDelegate.setOriginalSize(_:)), keyEquivalent: "1")
-        menu.addItem(withTitle: "Double Size", action: #selector(AppDelegate.setDoubleSize(_:)), keyEquivalent: "2")
-        menu.addItem(withTitle: "Fit to Screen", action: #selector(AppDelegate.fitToScreen(_:)), keyEquivalent: "4")
+        menu.addItem(withTitle: L("Half Size"), action: #selector(AppDelegate.setHalfSize(_:)), keyEquivalent: "`")
+        menu.addItem(withTitle: L("Actual Size"), action: #selector(AppDelegate.setOriginalSize(_:)), keyEquivalent: "1")
+        menu.addItem(withTitle: L("Double Size"), action: #selector(AppDelegate.setDoubleSize(_:)), keyEquivalent: "2")
+        menu.addItem(withTitle: L("Fit to Screen"), action: #selector(AppDelegate.fitToScreen(_:)), keyEquivalent: "4")
         menu.addItem(.separator())
 
         // Fill Screen & Aspect Ratio
-        menu.addItem(withTitle: "Fill Screen", action: #selector(AppDelegate.fillScreen(_:)), keyEquivalent: "f")
+        menu.addItem(withTitle: L("Fill Screen"), action: #selector(AppDelegate.fillScreen(_:)), keyEquivalent: "f")
 
-        let aspectItem = NSMenuItem(title: "Aspect Ratio", action: nil, keyEquivalent: "")
-        let aspectMenu = NSMenu(title: "Aspect Ratio")
+        let aspectItem = NSMenuItem(title: L("Aspect Ratio"), action: nil, keyEquivalent: "")
+        let aspectMenu = NSMenu(title: L("Aspect Ratio"))
+        // Aspect ratios — "Default" is the only translatable label; the numeric ratios
+        // are universally written the same way and use as setAspectRatio match keys.
         for (i, ratio) in ["Default", "4:3", "16:9", "16:10", "2.35:1", "2.39:1"].enumerated() {
-            let item = aspectMenu.addItem(withTitle: ratio, action: #selector(AppDelegate.setAspectRatio(_:)), keyEquivalent: "")
+            let title = ratio == "Default" ? L("Default") : ratio
+            let item = aspectMenu.addItem(withTitle: title, action: #selector(AppDelegate.setAspectRatio(_:)), keyEquivalent: "")
             if i == 0 { item.state = .on }
         }
         aspectItem.submenu = aspectMenu
@@ -832,37 +837,40 @@ class MenuManager {
         menu.addItem(.separator())
 
         // Rotate & Flip
-        let rotL = menu.addItem(withTitle: "Rotate Left", action: #selector(AppDelegate.rotateLeft(_:)), keyEquivalent: "l")
+        let rotL = menu.addItem(withTitle: L("Rotate Left"), action: #selector(AppDelegate.rotateLeft(_:)), keyEquivalent: "l")
         rotL.keyEquivalentModifierMask = [.shift, .command]
-        let rotR = menu.addItem(withTitle: "Rotate Right", action: #selector(AppDelegate.rotateRight(_:)), keyEquivalent: "r")
+        let rotR = menu.addItem(withTitle: L("Rotate Right"), action: #selector(AppDelegate.rotateRight(_:)), keyEquivalent: "r")
         rotR.keyEquivalentModifierMask = [.shift, .command]
-        let flipH = menu.addItem(withTitle: "Flip Horizontal", action: #selector(AppDelegate.flipHorizontal(_:)), keyEquivalent: "h")
+        let flipH = menu.addItem(withTitle: L("Flip Horizontal"), action: #selector(AppDelegate.flipHorizontal(_:)), keyEquivalent: "h")
         flipH.keyEquivalentModifierMask = [.shift, .command]
-        let flipV = menu.addItem(withTitle: "Flip Vertical", action: #selector(AppDelegate.flipVertical(_:)), keyEquivalent: "v")
+        let flipV = menu.addItem(withTitle: L("Flip Vertical"), action: #selector(AppDelegate.flipVertical(_:)), keyEquivalent: "v")
         flipV.keyEquivalentModifierMask = [.shift, .command]
-        menu.addItem(withTitle: "Revert Transform", action: #selector(AppDelegate.revertTransform(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Revert Transform"), action: #selector(AppDelegate.revertTransform(_:)), keyEquivalent: "")
         menu.addItem(.separator())
 
         // Crop submenu
-        let cropItem = NSMenuItem(title: "Crop", action: nil, keyEquivalent: "")
-        let cropMenu = NSMenu(title: "Crop")
+        let cropItem = NSMenuItem(title: L("Crop"), action: nil, keyEquivalent: "")
+        let cropMenu = NSMenu(title: L("Crop"))
         for crop in ["Default", "16:9", "4:3", "16:10", "1.85:1", "2.35:1"] {
-            cropMenu.addItem(withTitle: crop, action: #selector(AppDelegate.setCrop(_:)), keyEquivalent: "")
+            let title = crop == "Default" ? L("Default") : crop
+            cropMenu.addItem(withTitle: title, action: #selector(AppDelegate.setCrop(_:)), keyEquivalent: "")
         }
         cropItem.submenu = cropMenu
         menu.addItem(cropItem)
         menu.addItem(.separator())
 
         // Filters submenu
-        let filtersItem = NSMenuItem(title: "Filters", action: nil, keyEquivalent: "")
-        let filtersMenu = NSMenu(title: "Filters")
-        filtersMenu.addItem(withTitle: "Video Equalizer…", action: #selector(AppDelegate.showVideoEQ(_:)), keyEquivalent: "e")
+        let filtersItem = NSMenuItem(title: L("Filters"), action: nil, keyEquivalent: "")
+        let filtersMenu = NSMenu(title: L("Filters"))
+        filtersMenu.addItem(withTitle: L("Video Equalizer…"), action: #selector(AppDelegate.showVideoEQ(_:)), keyEquivalent: "e")
 
         // Deinterlace submenu inside Filters
-        let deinterlaceItem = NSMenuItem(title: "Deinterlace", action: nil, keyEquivalent: "")
-        let deinterlaceMenu = NSMenu(title: "Deinterlace")
+        let deinterlaceItem = NSMenuItem(title: L("Deinterlace"), action: nil, keyEquivalent: "")
+        let deinterlaceMenu = NSMenu(title: L("Deinterlace"))
+        // Deinterlace mode names are libvlc enum strings — pass through L() so
+        // localizable but keep raw English in the action handler lookup.
         for mode in ["Off", "Blend", "Bob", "Linear", "Yadif"] {
-            let item = deinterlaceMenu.addItem(withTitle: mode, action: #selector(AppDelegate.setDeinterlace(_:)), keyEquivalent: "")
+            let item = deinterlaceMenu.addItem(withTitle: L(mode), action: #selector(AppDelegate.setDeinterlace(_:)), keyEquivalent: "")
             if mode == "Off" { item.state = .on }
         }
         deinterlaceItem.submenu = deinterlaceMenu
@@ -873,7 +881,7 @@ class MenuManager {
         menu.addItem(.separator())
 
         // Screenshot
-        let ss = menu.addItem(withTitle: "Save Screenshot", action: #selector(AppDelegate.saveScreenshot(_:)), keyEquivalent: "s")
+        let ss = menu.addItem(withTitle: L("Save Screenshot"), action: #selector(AppDelegate.saveScreenshot(_:)), keyEquivalent: "s")
         ss.keyEquivalentModifierMask = [.option, .command]
 
         menuItem.submenu = menu
@@ -881,24 +889,24 @@ class MenuManager {
     }
 
     private static func createSubtitleMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "Subtitle", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Subtitle")
+        let menuItem = NSMenuItem(title: L("Subtitle"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("Subtitle"))
         // Delegate keeps the background-opacity slider synced to UserDefaults on open
         menu.delegate = SubtitleMenuDelegate.shared
 
         // Tracks section (dynamically populated)
-        let tracksItem = NSMenuItem(title: "Subtitle Track", action: nil, keyEquivalent: "")
-        let tracksSubmenu = NSMenu(title: "Subtitle Track")
+        let tracksItem = NSMenuItem(title: L("Subtitle Track"), action: nil, keyEquivalent: "")
+        let tracksSubmenu = NSMenu(title: L("Subtitle Track"))
         tracksSubmenu.delegate = TrackMenuDelegate.subtitle
         tracksItem.submenu = tracksSubmenu
         menu.addItem(tracksItem)
         menu.addItem(.separator())
 
         // Display Type submenu
-        let displayItem = NSMenuItem(title: "Display Type", action: nil, keyEquivalent: "")
-        let displayMenu = NSMenu(title: "Display Type")
+        let displayItem = NSMenuItem(title: L("Display Type"), action: nil, keyEquivalent: "")
+        let displayMenu = NSMenu(title: L("Display Type"))
         for (i, pos) in ["Bottom of Video", "Bottom of Screen", "Letterbox"].enumerated() {
-            let item = displayMenu.addItem(withTitle: pos, action: #selector(AppDelegate.setSubtitlePosition(_:)), keyEquivalent: "")
+            let item = displayMenu.addItem(withTitle: L(pos), action: #selector(AppDelegate.setSubtitlePosition(_:)), keyEquivalent: "")
             if i == 0 { item.state = .on }
         }
         displayItem.submenu = displayMenu
@@ -906,11 +914,11 @@ class MenuManager {
 
         // Text Color submenu — full HTML/CSS 16-color palette (matches VLC).
         // Writes to UserDefaults; SubtitleOverlayView KVO picks it up live.
-        let textColorItem = NSMenuItem(title: "Text Color", action: nil, keyEquivalent: "")
-        let textColorMenu = NSMenu(title: "Text Color")
+        let textColorItem = NSMenuItem(title: L("Text Color"), action: nil, keyEquivalent: "")
+        let textColorMenu = NSMenu(title: L("Text Color"))
         let currentTextColor = UserDefaults.standard.integer(forKey: Defaults.subtitleColor)
         for (i, entry) in SubtitleOverlayView.namedColors.enumerated() {
-            let item = textColorMenu.addItem(withTitle: entry.name,
+            let item = textColorMenu.addItem(withTitle: L(entry.name),
                 action: #selector(AppDelegate.setSubtitleTextColor(_:)), keyEquivalent: "")
             item.tag = i
             item.image = SubtitleOverlayView.swatchImage(for: entry.color)
@@ -920,11 +928,11 @@ class MenuManager {
         menu.addItem(textColorItem)
 
         // Outline Thickness submenu
-        let outlineItem = NSMenuItem(title: "Outline Thickness", action: nil, keyEquivalent: "")
-        let outlineMenu = NSMenu(title: "Outline Thickness")
+        let outlineItem = NSMenuItem(title: L("Outline Thickness"), action: nil, keyEquivalent: "")
+        let outlineMenu = NSMenu(title: L("Outline Thickness"))
         let currentOutline = UserDefaults.standard.integer(forKey: Defaults.subtitleOutlineThickness)
         for thickness in 0...6 {
-            let title = thickness == 0 ? "None" : "\(thickness) px"
+            let title = thickness == 0 ? L("None") : String(format: L("%d px"), thickness)
             let item = outlineMenu.addItem(withTitle: title, action: #selector(AppDelegate.setSubtitleOutlineThickness(_:)), keyEquivalent: "")
             item.tag = thickness
             if thickness == currentOutline { item.state = .on }
@@ -940,11 +948,11 @@ class MenuManager {
         menu.addItem(opacityItem)
 
         // Background Color submenu — same HTML/CSS 16-color palette as Text Color
-        let bgColorItem = NSMenuItem(title: "Background Color", action: nil, keyEquivalent: "")
-        let bgColorMenu = NSMenu(title: "Background Color")
+        let bgColorItem = NSMenuItem(title: L("Background Color"), action: nil, keyEquivalent: "")
+        let bgColorMenu = NSMenu(title: L("Background Color"))
         let currentBgColor = UserDefaults.standard.integer(forKey: Defaults.subtitleBackgroundColor)
         for (i, entry) in SubtitleOverlayView.namedColors.enumerated() {
-            let item = bgColorMenu.addItem(withTitle: entry.name,
+            let item = bgColorMenu.addItem(withTitle: L(entry.name),
                 action: #selector(AppDelegate.setSubtitleBackgroundColor(_:)), keyEquivalent: "")
             item.tag = i
             item.image = SubtitleOverlayView.swatchImage(for: entry.color)
@@ -956,57 +964,58 @@ class MenuManager {
         menu.addItem(.separator())
 
         // Hide Subtitles
-        let hide = menu.addItem(withTitle: "Hide Subtitles", action: #selector(AppDelegate.toggleSubtitles(_:)), keyEquivalent: "v")
+        let hide = menu.addItem(withTitle: L("Hide Subtitles"), action: #selector(AppDelegate.toggleSubtitles(_:)), keyEquivalent: "v")
         hide.keyEquivalentModifierMask = [.control]
         menu.addItem(.separator())
 
         // Add Subtitle File
-        menu.addItem(withTitle: "Add Subtitle File…", action: #selector(AppDelegate.addSubtitleFile(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Add Subtitle File…"), action: #selector(AppDelegate.addSubtitleFile(_:)), keyEquivalent: "")
         menu.addItem(.separator())
 
         // Sync section
-        let syncHeader = NSMenuItem(title: "Sync.", action: nil, keyEquivalent: "")
+        let syncHeader = NSMenuItem(title: L("Sync."), action: nil, keyEquivalent: "")
         syncHeader.isEnabled = false
         menu.addItem(syncHeader)
-        menu.addItem(withTitle: "Pull", action: #selector(AppDelegate.subtitleSyncPull(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Push", action: #selector(AppDelegate.subtitleSyncPush(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Revert Sync.", action: #selector(AppDelegate.subtitleSyncRevert(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Pull"), action: #selector(AppDelegate.subtitleSyncPull(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Push"), action: #selector(AppDelegate.subtitleSyncPush(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Revert Sync."), action: #selector(AppDelegate.subtitleSyncRevert(_:)), keyEquivalent: "")
 
         menuItem.submenu = menu
         return menuItem
     }
 
     private static func createPlaylistMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "Playlist", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Playlist")
+        let menuItem = NSMenuItem(title: L("Playlist"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("Playlist"))
 
-        let showPlaylist = menu.addItem(withTitle: "Show Playlist", action: #selector(AppDelegate.togglePlaylistPanel(_:)), keyEquivalent: "p")
+        let showPlaylist = menu.addItem(withTitle: L("Show Playlist"), action: #selector(AppDelegate.togglePlaylistPanel(_:)), keyEquivalent: "p")
         showPlaylist.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Repeat Off", action: #selector(AppDelegate.setRepeatOff(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Repeat One", action: #selector(AppDelegate.setRepeatOne(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Repeat All", action: #selector(AppDelegate.setRepeatAll(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Repeat Off"), action: #selector(AppDelegate.setRepeatOff(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Repeat One"), action: #selector(AppDelegate.setRepeatOne(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Repeat All"), action: #selector(AppDelegate.setRepeatAll(_:)), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Shuffle", action: #selector(AppDelegate.toggleShuffle(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Shuffle"), action: #selector(AppDelegate.toggleShuffle(_:)), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Previous", action: #selector(AppDelegate.previousTrack(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Next", action: #selector(AppDelegate.nextTrack(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Previous"), action: #selector(AppDelegate.previousTrack(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Next"), action: #selector(AppDelegate.nextTrack(_:)), keyEquivalent: "")
 
         menuItem.submenu = menu
         return menuItem
     }
 
     private static func createCastMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "Cast", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Cast")
+        let menuItem = NSMenuItem(title: L("Cast"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("Cast"))
 
+        // AirPlay, Chromecast, DLNA: proper brand names, kept as-is across languages
         let airplayItem = NSMenuItem(title: "AirPlay", action: nil, keyEquivalent: "")
         let airplaySubmenu = NSMenu(title: "AirPlay")
         airplaySubmenu.delegate = AirPlayMenuDelegate.shared
         airplayItem.submenu = airplaySubmenu
         menu.addItem(airplayItem)
 
-        menu.addItem(withTitle: "Play on External Display", action: #selector(AppDelegate.playOnExternalDisplay(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Play on External Display"), action: #selector(AppDelegate.playOnExternalDisplay(_:)), keyEquivalent: "")
         menu.addItem(.separator())
 
         let chromecastItem = NSMenuItem(title: "Chromecast", action: nil, keyEquivalent: "")
@@ -1017,22 +1026,22 @@ class MenuManager {
 
         menu.addItem(withTitle: "DLNA", action: #selector(AppDelegate.showDLNA(_:)), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Disconnect", action: #selector(AppDelegate.disconnectCast(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Disconnect"), action: #selector(AppDelegate.disconnectCast(_:)), keyEquivalent: "")
 
         menuItem.submenu = menu
         return menuItem
     }
 
     private static func createWindowMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Window")
+        let menuItem = NSMenuItem(title: L("Window"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("Window"))
 
-        menu.addItem(withTitle: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m")
-        menu.addItem(withTitle: "Zoom", action: #selector(NSWindow.zoom(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Minimize"), action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m")
+        menu.addItem(withTitle: L("Zoom"), action: #selector(NSWindow.zoom(_:)), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Keep on Top", action: #selector(AppDelegate.toggleAlwaysOnTop(_:)), keyEquivalent: "t")
+        menu.addItem(withTitle: L("Keep on Top"), action: #selector(AppDelegate.toggleAlwaysOnTop(_:)), keyEquivalent: "t")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Media Inspector", action: #selector(AppDelegate.showInspector(_:)), keyEquivalent: "i")
+        menu.addItem(withTitle: L("Media Inspector"), action: #selector(AppDelegate.showInspector(_:)), keyEquivalent: "i")
 
         NSApplication.shared.windowsMenu = menu
         menuItem.submenu = menu
@@ -1040,9 +1049,9 @@ class MenuManager {
     }
 
     private static func createHelpMenu() -> NSMenuItem {
-        let menuItem = NSMenuItem(title: "Help", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Help")
-        menu.addItem(withTitle: "Awesome Player Help", action: #selector(NSApplication.showHelp(_:)), keyEquivalent: "?")
+        let menuItem = NSMenuItem(title: L("Help"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: L("Help"))
+        menu.addItem(withTitle: L("Awesome Player Help"), action: #selector(NSApplication.showHelp(_:)), keyEquivalent: "?")
         NSApplication.shared.helpMenu = menu
         menuItem.submenu = menu
         return menuItem

@@ -9,7 +9,7 @@ class PlaylistPanelView: NSView {
     weak var delegate: PlaylistPanelDelegate?
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
-    private let headerLabel = NSTextField(labelWithString: "Playlist")
+    private let headerLabel = NSTextField(labelWithString: L("Playlist"))
     private(set) var items: [URL] = []
     var currentIndex: Int = -1 {
         didSet { tableView.reloadData() }
@@ -35,7 +35,7 @@ class PlaylistPanelView: NSView {
         addSubview(headerLabel)
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("file"))
-        column.title = "File"
+        column.title = L("File")
         tableView.addTableColumn(column)
         tableView.headerView = nil
         tableView.backgroundColor = .clear

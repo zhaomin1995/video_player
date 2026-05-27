@@ -47,6 +47,7 @@
 		E55EEC072FC230F3000EE159 /* AudioPassthroughManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55EEC062FC230F3000EE159 /* AudioPassthroughManager.swift */; };
 		A10081 /* VideoEQPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10081 /* VideoEQPanelController.swift */; };
 		A10082 /* MediaInspectorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10082 /* MediaInspectorController.swift */; };
+		A10110 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F10110 /* Localizable.xcstrings */; };
 		A10100 /* ConvertStreamWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10100 /* ConvertStreamWindowController.swift */; };
 		A10090 /* KeyBindingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10090 /* KeyBindingManager.swift */; };
 /* End PBXBuildFile section */
@@ -82,6 +83,7 @@
 		F10032 /* Defaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Defaults.swift; sourceTree = "<group>"; };
 		F10033 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		F10034 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F10110 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F10035 /* CastingHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingHTTPServer.swift; sourceTree = "<group>"; };
 		F10036 /* CastingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingManager.swift; sourceTree = "<group>"; };
 		F10037 /* ChromecastManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromecastManager.swift; sourceTree = "<group>"; };
@@ -140,6 +142,7 @@
 				F10060 /* main.swift */,
 				F10001 /* AppDelegate.swift */,
 				F10034 /* Info.plist */,
+				F10110 /* Localizable.xcstrings */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -337,6 +340,15 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
+				"zh-Hant",
+				ja,
+				ko,
+				es,
+				fr,
+				de,
+				"pt-BR",
+				ru,
 			);
 			mainGroup = G00000;
 			productRefGroup = G00099 /* Products */;
@@ -353,6 +365,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10110 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

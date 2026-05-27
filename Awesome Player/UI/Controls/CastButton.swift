@@ -90,7 +90,7 @@ class CastButton: NSView {
             picker.widthAnchor.constraint(equalToConstant: 28),
             picker.heightAnchor.constraint(equalToConstant: 28),
         ])
-        toolTip = "AirPlay / Cast"
+        toolTip = L("AirPlay / Cast")
     }
 
     private func installCustomButton() {
@@ -106,7 +106,7 @@ class CastButton: NSView {
             btn.image = img
             btn.contentTintColor = .white
         } else {
-            btn.title = "AirPlay"
+            btn.title = L("AirPlay")
         }
         addSubview(btn)
         customButton = btn
@@ -118,7 +118,7 @@ class CastButton: NSView {
             btn.widthAnchor.constraint(equalToConstant: 28),
             btn.heightAnchor.constraint(equalToConstant: 28),
         ])
-        toolTip = "AirPlay"
+        toolTip = L("AirPlay")
     }
 
     @objc private func customButtonClicked(_ sender: NSButton) {

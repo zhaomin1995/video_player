@@ -7,7 +7,7 @@ class MediaInspectorController: NSWindowController {
         let window = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: 350),
                             styleMask: [.titled, .closable, .resizable, .utilityWindow],
                             backing: .buffered, defer: false)
-        window.title = "Media Inspector"
+        window.title = L("Media Inspector")
         window.isFloatingPanel = true
         window.becomesKeyOnlyIfNeeded = true
         window.minSize = NSSize(width: 300, height: 200)
@@ -35,7 +35,7 @@ class MediaInspectorController: NSWindowController {
 
         let probe = FFmpegBridge.probeFile(url.path)
         lines.append("")
-        lines.append("--- Video ---")
+        lines.append(L("--- Video ---"))
         if let codecName = FFmpegBridge.videoCodecName(forFile: url.path) {
             lines.append("Codec: \(codecName)")
         }
@@ -45,7 +45,7 @@ class MediaInspectorController: NSWindowController {
         if probe.hasHDR.boolValue { lines.append("HDR: Yes") }
 
         lines.append("")
-        lines.append("--- Audio ---")
+        lines.append(L("--- Audio ---"))
         lines.append("Tracks: \(probe.numAudioTracks)")
         lines.append("Channels: \(probe.audioChannels)")
         lines.append("Sample Rate: \(probe.audioSampleRate) Hz")
@@ -59,7 +59,7 @@ class MediaInspectorController: NSWindowController {
         }
 
         lines.append("")
-        lines.append("--- Subtitles ---")
+        lines.append(L("--- Subtitles ---"))
         lines.append("Tracks: \(probe.numSubtitleTracks)")
         let subTracks = FFmpegBridge.subtitleTracks(forFile: url.path)
         for track in subTracks {

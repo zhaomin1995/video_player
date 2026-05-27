@@ -56,11 +56,11 @@ class ConvertStreamWindowController: NSWindowController {
 
     private var selectedInputURL: URL?
     private let dropZone = ConvertDropZoneView()
-    private let mediaLabel = NSTextField(labelWithString: "No media selected")
+    private let mediaLabel = NSTextField(labelWithString: L("No media selected"))
     private let profilePopUp = NSPopUpButton()
-    private let saveButton = NSButton(title: "Save as File", target: nil, action: nil)
-    private let streamButton = NSButton(title: "Stream", target: nil, action: nil)
-    private let goButton = NSButton(title: "Go!", target: nil, action: nil)
+    private let saveButton = NSButton(title: L("Save as File"), target: nil, action: nil)
+    private let streamButton = NSButton(title: L("Stream"), target: nil, action: nil)
+    private let goButton = NSButton(title: L("Go!"), target: nil, action: nil)
     private let progressBar = NSProgressIndicator()
     private let statusLabel = NSTextField(labelWithString: "")
 
@@ -84,7 +84,7 @@ class ConvertStreamWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "Convert & Stream"
+        window.title = L("Convert & Stream")
         window.minSize = NSSize(width: 500, height: 450)
         window.center()
         super.init(window: window)
@@ -101,7 +101,7 @@ class ConvertStreamWindowController: NSWindowController {
         guard let contentView = window?.contentView else { return }
 
         // Section 1: Drop zone for media
-        let dropBox = sectionBox(title: "Drop media here")
+        let dropBox = sectionBox(title: L("Drop media here"))
         dropZone.translatesAutoresizingMaskIntoConstraints = false
         dropZone.onFileDropped = { [weak self] url in self?.setInputURL(url) }
         dropBox.contentView?.addSubview(dropZone)
@@ -112,20 +112,20 @@ class ConvertStreamWindowController: NSWindowController {
         mediaLabel.alignment = .center
         dropBox.contentView?.addSubview(mediaLabel)
 
-        let openButton = NSButton(title: "Open Media…", target: self, action: #selector(openMediaClicked))
+        let openButton = NSButton(title: L("Open Media…"), target: self, action: #selector(openMediaClicked))
         openButton.bezelStyle = .rounded
         openButton.translatesAutoresizingMaskIntoConstraints = false
         dropBox.contentView?.addSubview(openButton)
 
         // Section 2: Profile picker
-        let profileBox = sectionBox(title: "Choose Profile")
+        let profileBox = sectionBox(title: L("Choose Profile"))
         for p in Self.profiles { profilePopUp.addItem(withTitle: p.name) }
         profilePopUp.selectItem(at: 0)
         profilePopUp.translatesAutoresizingMaskIntoConstraints = false
         profileBox.contentView?.addSubview(profilePopUp)
 
         // Section 3: Destination
-        let destBox = sectionBox(title: "Choose Destination")
+        let destBox = sectionBox(title: L("Choose Destination"))
         saveButton.bezelStyle = .rounded
         saveButton.target = self
         saveButton.action = #selector(saveAsFileClicked)
@@ -253,8 +253,8 @@ class ConvertStreamWindowController: NSWindowController {
         // protocol, host, and port. For this release we don't implement it
         // and just show a notice.
         let alert = NSAlert()
-        alert.messageText = "Stream Output"
-        alert.informativeText = "Streaming is not implemented yet. Use Save as File to transcode to disk."
+        alert.messageText = L("Stream Output")
+        alert.informativeText = L("Streaming is not implemented yet. Use Save as File to transcode to disk.")
         alert.runModal()
     }
 
@@ -263,7 +263,7 @@ class ConvertStreamWindowController: NSWindowController {
         let profile = Self.profiles[profilePopUp.indexOfSelectedItem]
 
         let savePanel = NSSavePanel()
-        savePanel.title = "Save Converted Media"
+        savePanel.title = L("Save Converted Media")
         savePanel.nameFieldStringValue = input.deletingPathExtension().lastPathComponent + "." + profile.fileExtension
         if let utType = UTType(filenameExtension: profile.fileExtension) {
             savePanel.allowedContentTypes = [utType]
@@ -278,7 +278,7 @@ class ConvertStreamWindowController: NSWindowController {
 
     private func startConversion(input: URL, output: URL, profile: ConvertProfile) {
         guard let instance = VLCPlayerEngine.sharedInstance else {
-            statusLabel.stringValue = "libvlc instance unavailable"
+            statusLabel.stringValue = L("libvlc instance unavailable")
             return
         }
 
@@ -288,7 +288,7 @@ class ConvertStreamWindowController: NSWindowController {
 
         // Build the media + sout option
         guard let media = libvlc_media_new_path(instance, input.path) else {
-            statusLabel.stringValue = "Failed to open input file"
+            statusLabel.stringValue = L("Failed to open input file")
             return
         }
         let sout = profile.soutOption(outputPath: output.path)
@@ -302,7 +302,7 @@ class ConvertStreamWindowController: NSWindowController {
 
         guard let player = libvlc_media_player_new_from_media(media) else {
             libvlc_media_release(media)
-            statusLabel.stringValue = "Failed to create transcoder"
+            statusLabel.stringValue = L("Failed to create transcoder")
             return
         }
         // Do NOT call libvlc_media_player_set_nsobject — convert is headless.
@@ -320,7 +320,7 @@ class ConvertStreamWindowController: NSWindowController {
         profilePopUp.isEnabled = false
         progressBar.isHidden = false
         progressBar.doubleValue = 0
-        statusLabel.stringValue = "Converting…"
+        statusLabel.stringValue = L("Converting…")
 
         progressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.tickProgress()
@@ -375,18 +375,18 @@ class ConvertStreamWindowController: NSWindowController {
         if success, let out = pendingOutputURL {
             statusLabel.stringValue = "Saved to \(out.lastPathComponent)"
             let alert = NSAlert()
-            alert.messageText = "Conversion Complete"
+            alert.messageText = L("Conversion Complete")
             alert.informativeText = "Saved to \(out.path)"
-            alert.addButton(withTitle: "Reveal in Finder")
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: L("Reveal in Finder"))
+            alert.addButton(withTitle: L("OK"))
             if alert.runModal() == .alertFirstButtonReturn {
                 NSWorkspace.shared.activateFileViewerSelecting([out])
             }
         } else {
-            statusLabel.stringValue = "Conversion failed"
+            statusLabel.stringValue = L("Conversion failed")
             let alert = NSAlert()
-            alert.messageText = "Conversion Failed"
-            alert.informativeText = "libvlc reported an error during transcoding. The profile may be incompatible with the source codec."
+            alert.messageText = L("Conversion Failed")
+            alert.informativeText = L("libvlc reported an error during transcoding. The profile may be incompatible with the source codec.")
             alert.runModal()
         }
         pendingOutputURL = nil

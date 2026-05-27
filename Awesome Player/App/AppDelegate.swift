@@ -94,12 +94,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openURL(_ sender: Any?) {
         let alert = NSAlert()
-        alert.messageText = "Open URL"
-        alert.informativeText = "Enter a media URL or YouTube/web link:"
-        alert.addButton(withTitle: "Open")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = L("Open URL")
+        alert.informativeText = L("Enter a media URL or YouTube/web link:")
+        alert.addButton(withTitle: L("Open"))
+        alert.addButton(withTitle: L("Cancel"))
         let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 400, height: 24))
-        input.placeholderString = "https://example.com/video.mp4 or YouTube URL"
+        input.placeholderString = L("https://example.com/video.mp4 or YouTube URL")
         alert.accessoryView = input
         if alert.runModal() == .alertFirstButtonReturn,
            !input.stringValue.isEmpty {
@@ -160,10 +160,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func resolveWithYTDLP(_ urlString: String) {
         guard let ytdlp = findYTDLP() else {
-            windowController?.playerViewController.showOSD("yt-dlp not found", duration: 5.0)
+            windowController?.playerViewController.showOSD(L("yt-dlp not found"), duration: 5.0)
             return
         }
-        windowController?.playerViewController.showOSD("Fetching formats…", duration: 60.0)
+        windowController?.playerViewController.showOSD(L("Fetching formats…"), duration: 60.0)
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let result = self?.runYTDLP(ytdlp, arguments: ["-j", "--no-warnings", "--no-playlist", urlString]),
@@ -172,7 +172,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                   let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                   let formats = json["formats"] as? [[String: Any]] else {
                 DispatchQueue.main.async {
-                    self?.windowController?.playerViewController.showOSD("Failed to fetch video info", duration: 5.0)
+                    self?.windowController?.playerViewController.showOSD(L("Failed to fetch video info"), duration: 5.0)
                 }
                 return
             }
@@ -203,7 +203,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             guard !videoFormats.isEmpty else {
                 DispatchQueue.main.async {
-                    self?.windowController?.playerViewController.showOSD("No video formats found", duration: 5.0)
+                    self?.windowController?.playerViewController.showOSD(L("No video formats found"), duration: 5.0)
                 }
                 return
             }
@@ -217,10 +217,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showResolutionPicker(title: String, formats: [YTDLPFormat], ytdlp: String, urlString: String) {
         let alert = NSAlert()
-        alert.messageText = "Select Resolution"
+        alert.messageText = L("Select Resolution")
         alert.informativeText = title
-        alert.addButton(withTitle: "Play")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: L("Play"))
+        alert.addButton(withTitle: L("Cancel"))
 
         let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 300, height: 28), pullsDown: false)
         for fmt in formats {
@@ -243,7 +243,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let result = self?.runYTDLP(ytdlp, arguments: ["--get-url", "-f", formatSpec, "--no-warnings", "--no-playlist", urlString]),
                   result.exitCode == 0 else {
                 DispatchQueue.main.async {
-                    self?.windowController?.playerViewController.showOSD("Failed to get stream URL", duration: 5.0)
+                    self?.windowController?.playerViewController.showOSD(L("Failed to get stream URL"), duration: 5.0)
                 }
                 return
             }
@@ -251,7 +251,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let urls = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "\n").compactMap { URL(string: $0) }
             guard let videoURL = urls.first else {
                 DispatchQueue.main.async {
-                    self?.windowController?.playerViewController.showOSD("Failed to get stream URL", duration: 5.0)
+                    self?.windowController?.playerViewController.showOSD(L("Failed to get stream URL"), duration: 5.0)
                 }
                 return
             }
@@ -318,12 +318,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func jumpToTime(_ sender: Any?) {
         let alert = NSAlert()
-        alert.messageText = "Jump to Time"
-        alert.informativeText = "Enter time (e.g. 1:30 or 90):"
-        alert.addButton(withTitle: "Jump")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = L("Jump to Time")
+        alert.informativeText = L("Enter time (e.g. 1:30 or 90):")
+        alert.addButton(withTitle: L("Jump"))
+        alert.addButton(withTitle: L("Cancel"))
         let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
-        input.placeholderString = "0:00"
+        input.placeholderString = L("0:00")
         alert.accessoryView = input
         if alert.runModal() == .alertFirstButtonReturn {
             windowController?.playerViewController.seekToAbsoluteTime(parseTimeInput(input.stringValue))
@@ -577,7 +577,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
               let device = item.representedObject as? (name: String, host: String, port: Int) else { return }
         guard let vc = windowController?.playerViewController else { return }
         guard let fileURL = vc.currentFileURL else {
-            vc.showOSD("No file playing")
+            vc.showOSD(L("No file playing"))
             return
         }
 
@@ -600,12 +600,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func showDLNA(_ sender: Any?) {
         castingManager.delegate = self
         castingManager.startDiscovery()
-        windowController?.playerViewController.showOSD("Searching for DLNA devices…", duration: 3.0)
+        windowController?.playerViewController.showOSD(L("Searching for DLNA devices…"), duration: 3.0)
     }
 
     @objc func disconnectCast(_ sender: Any?) {
         castingManager.disconnect()
-        windowController?.playerViewController.showOSD("Disconnected")
+        windowController?.playerViewController.showOSD(L("Disconnected"))
     }
 
     // MARK: - Window Menu
@@ -710,9 +710,9 @@ extension AppDelegate: CastingManagerDelegate {
         case .playing(let device):
             windowController?.playerViewController.showOSD("Casting to \(device.name)")
         case .disconnected:
-            windowController?.playerViewController.showOSD("Cast disconnected")
+            windowController?.playerViewController.showOSD(L("Cast disconnected"))
         case .connecting:
-            windowController?.playerViewController.showOSD("Connecting…")
+            windowController?.playerViewController.showOSD(L("Connecting…"))
         }
     }
 
