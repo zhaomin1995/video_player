@@ -71,11 +71,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
-        for filename in filenames {
+        if let filename = filenames.first {
             let url = URL(fileURLWithPath: filename)
             RecentDocumentsMenuDelegate.addRecentFile(url)
             windowController?.openFile(url: url)
-            break
         }
         sender.reply(toOpenOrPrint: .success)
     }
@@ -296,6 +295,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.playerViewController.saveScreenshot()
     }
 
+    private var convertStreamController: ConvertStreamWindowController?
+
+    @objc func showConvertStream(_ sender: Any?) {
+        if convertStreamController == nil {
+            convertStreamController = ConvertStreamWindowController()
+        }
+        convertStreamController?.showWindow(nil)
+        convertStreamController?.window?.makeKeyAndOrderFront(nil)
+    }
+
     // MARK: - Playback Menu
 
     @objc func togglePlayPause(_ sender: Any?) {
@@ -348,11 +357,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func setEQPreset(_ sender: Any?) {
         guard let item = sender as? NSMenuItem, let menu = item.menu else { return }
-        for mi in menu.items { mi.state = .off }
+        // Clear only items that share our action (skip the separator)
+        for mi in menu.items where mi.action == item.action { mi.state = .off }
         item.state = .on
-        let index = menu.index(of: item)
-        UserDefaults.standard.set(index, forKey: Defaults.defaultEQPreset)
-        windowController?.playerViewController.applyEQPreset(index)
+        let presetIndex = item.tag
+        UserDefaults.standard.set(presetIndex, forKey: Defaults.defaultEQPreset)
+        windowController?.playerViewController.applyEQPreset(presetIndex)
         windowController?.playerViewController.showOSD("EQ: \(item.title)")
     }
 
@@ -481,6 +491,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         item.state = .on
         windowController?.playerViewController.updateSubtitlePosition()
         windowController?.playerViewController.showOSD("Subtitle: \(item.title)")
+    }
+
+    @objc func setSubtitleTextColor(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem, let menu = item.menu else { return }
+        for mi in menu.items { mi.state = .off }
+        item.state = .on
+        UserDefaults.standard.set(item.tag, forKey: Defaults.subtitleColor)
+        windowController?.playerViewController.showOSD("Subtitle color: \(item.title)")
+    }
+
+    @objc func setSubtitleOutlineThickness(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem, let menu = item.menu else { return }
+        for mi in menu.items { mi.state = .off }
+        item.state = .on
+        UserDefaults.standard.set(item.tag, forKey: Defaults.subtitleOutlineThickness)
+        windowController?.playerViewController.showOSD("Outline: \(item.title)")
+    }
+
+    @objc func setSubtitleBackgroundColor(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem, let menu = item.menu else { return }
+        for mi in menu.items { mi.state = .off }
+        item.state = .on
+        UserDefaults.standard.set(item.tag, forKey: Defaults.subtitleBackgroundColor)
+        windowController?.playerViewController.showOSD("Background: \(item.title)")
     }
 
     @objc func subtitleSyncPull(_ sender: Any?) {

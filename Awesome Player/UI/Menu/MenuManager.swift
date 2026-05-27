@@ -445,6 +445,157 @@ class ChapterMenuDelegate: NSObject, NSMenuDelegate {
     }
 }
 
+/// VLC-style playback speed slider that lives inline in the Playback menu.
+/// Uses a log2 scale so 1.0× sits dead center between 0.25× and 4.0×.
+class PlaybackSpeedSliderView: NSView {
+    static let shared = PlaybackSpeedSliderView()
+
+    private let titleLabel = NSTextField(labelWithString: "Playback Speed")
+    private let valueLabel = NSTextField(labelWithString: "1.00x")
+    private let slider = NSSlider()
+    private let slowerLabel = NSTextField(labelWithString: "Slower")
+    private let normalLabel = NSTextField(labelWithString: "Normal")
+    private let fasterLabel = NSTextField(labelWithString: "Faster")
+
+    init() {
+        super.init(frame: NSRect(x: 0, y: 0, width: 320, height: 64))
+        setupViews()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setupViews() {
+        titleLabel.font = .systemFont(ofSize: 13)
+        valueLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium)
+        valueLabel.alignment = .right
+        for l in [slowerLabel, normalLabel, fasterLabel] {
+            l.font = .systemFont(ofSize: 10)
+            l.textColor = .secondaryLabelColor
+        }
+        normalLabel.alignment = .center
+
+        // Log2 scale: slider ∈ [-2, 2] → speed ∈ [0.25, 4.0], 0 → 1.0× centered
+        slider.minValue = -2.0
+        slider.maxValue = 2.0
+        slider.doubleValue = 0.0
+        slider.numberOfTickMarks = 17
+        slider.tickMarkPosition = .below
+        slider.allowsTickMarkValuesOnly = false
+        slider.target = self
+        slider.action = #selector(sliderChanged)
+        slider.isContinuous = true
+
+        for v in [titleLabel, valueLabel, slider, slowerLabel, normalLabel, fasterLabel] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(v)
+        }
+
+        NSLayoutConstraint.activate([
+            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 4),
+            valueLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            valueLabel.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+
+            slider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            slider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            slider.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+
+            slowerLabel.leadingAnchor.constraint(equalTo: slider.leadingAnchor),
+            slowerLabel.topAnchor.constraint(equalTo: slider.bottomAnchor, constant: -2),
+            slowerLabel.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -4),
+            normalLabel.centerXAnchor.constraint(equalTo: slider.centerXAnchor),
+            normalLabel.topAnchor.constraint(equalTo: slider.bottomAnchor, constant: -2),
+            fasterLabel.trailingAnchor.constraint(equalTo: slider.trailingAnchor),
+            fasterLabel.topAnchor.constraint(equalTo: slider.bottomAnchor, constant: -2),
+        ])
+    }
+
+    @objc private func sliderChanged() {
+        let speed = Float(pow(2.0, slider.doubleValue))
+        valueLabel.stringValue = String(format: "%.2fx", speed)
+        guard let wc = NSApp.mainWindow?.windowController as? PlayerWindowController else { return }
+        wc.playerViewController.setSpeed(speed)
+    }
+
+    /// Sync the slider to the live playback rate. Called from PlaybackMenuDelegate
+    /// on menu-open so the slider reflects state changed via presets or keyboard.
+    func refreshFromPlayer() {
+        let speed: Float
+        if let wc = NSApp.mainWindow?.windowController as? PlayerWindowController {
+            let vc = wc.playerViewController
+            speed = vc.playerEngine?.rate ?? vc.vlcEngine?.rate ?? 1.0
+        } else {
+            speed = 1.0
+        }
+        let clamped = max(0.25, min(4.0, speed))
+        slider.doubleValue = log2(Double(clamped))
+        valueLabel.stringValue = String(format: "%.2fx", clamped)
+    }
+}
+
+class PlaybackMenuDelegate: NSObject, NSMenuDelegate {
+    static let shared = PlaybackMenuDelegate()
+    func menuWillOpen(_ menu: NSMenu) {
+        PlaybackSpeedSliderView.shared.refreshFromPlayer()
+    }
+}
+
+/// VLC-style inline opacity slider for subtitle background. 0% → fully
+/// transparent, 100% → fully opaque (color chosen via Background Color submenu).
+class SubtitleOpacitySliderView: NSView {
+    static let shared = SubtitleOpacitySliderView()
+
+    private let titleLabel = NSTextField(labelWithString: "Background Opacity")
+    private let slider = NSSlider()
+
+    init() {
+        super.init(frame: NSRect(x: 0, y: 0, width: 320, height: 48))
+        setupViews()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setupViews() {
+        titleLabel.font = .systemFont(ofSize: 13)
+
+        slider.minValue = 0.0
+        slider.maxValue = 1.0
+        slider.doubleValue = UserDefaults.standard.double(forKey: Defaults.subtitleBackgroundOpacity)
+        slider.numberOfTickMarks = 21
+        slider.tickMarkPosition = .below
+        slider.target = self
+        slider.action = #selector(sliderChanged)
+        slider.isContinuous = true
+
+        for v in [titleLabel, slider] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(v)
+        }
+
+        NSLayoutConstraint.activate([
+            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 4),
+            slider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            slider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            slider.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+            slider.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -4),
+        ])
+    }
+
+    @objc private func sliderChanged() {
+        UserDefaults.standard.set(slider.doubleValue, forKey: Defaults.subtitleBackgroundOpacity)
+    }
+
+    func refreshFromDefaults() {
+        slider.doubleValue = UserDefaults.standard.double(forKey: Defaults.subtitleBackgroundOpacity)
+    }
+}
+
+class SubtitleMenuDelegate: NSObject, NSMenuDelegate {
+    static let shared = SubtitleMenuDelegate()
+    func menuWillOpen(_ menu: NSMenu) {
+        SubtitleOpacitySliderView.shared.refreshFromDefaults()
+    }
+}
+
 class MenuManager {
     static func setupMainMenu() {
         let mainMenu = NSMenu()
@@ -523,6 +674,10 @@ class MenuManager {
         menu.addItem(.separator())
         menu.addItem(withTitle: "Save Screenshot", action: #selector(AppDelegate.saveScreenshot(_:)), keyEquivalent: "s")
         menu.addItem(.separator())
+        let convertItem = menu.addItem(withTitle: "Convert / Stream…",
+            action: #selector(AppDelegate.showConvertStream(_:)), keyEquivalent: "s")
+        convertItem.keyEquivalentModifierMask = [.shift, .command]
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Close", action: #selector(NSWindow.close), keyEquivalent: "w")
 
         menuItem.submenu = menu
@@ -532,6 +687,8 @@ class MenuManager {
     private static func createPlaybackMenu() -> NSMenuItem {
         let menuItem = NSMenuItem(title: "Playback", action: nil, keyEquivalent: "")
         let menu = NSMenu(title: "Playback")
+        // Delegate refreshes the speed slider value from live playback rate on open
+        menu.delegate = PlaybackMenuDelegate.shared
 
         menu.addItem(withTitle: "Play / Pause", action: #selector(AppDelegate.togglePlayPause(_:)), keyEquivalent: " ")
 
@@ -545,8 +702,14 @@ class MenuManager {
         menu.addItem(withTitle: "Jump to Time…", action: #selector(AppDelegate.jumpToTime(_:)), keyEquivalent: "j")
 
         menu.addItem(.separator())
-        let speedMenu = NSMenuItem(title: "Speed", action: nil, keyEquivalent: "")
-        let speedSubmenu = NSMenu(title: "Speed")
+        // VLC-style inline speed slider (continuous 0.25× to 4×, log scale)
+        let speedSliderItem = NSMenuItem()
+        speedSliderItem.view = PlaybackSpeedSliderView.shared
+        menu.addItem(speedSliderItem)
+
+        // Keep discrete presets for users who prefer click-to-set
+        let speedMenu = NSMenuItem(title: "Speed Presets", action: nil, keyEquivalent: "")
+        let speedSubmenu = NSMenu(title: "Speed Presets")
         for speed in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0] {
             let item = speedSubmenu.addItem(withTitle: String(format: "%.2gx", speed), action: #selector(AppDelegate.setSpeed(_:)), keyEquivalent: "")
             if speed == 1.0 { item.state = .on }
@@ -580,13 +743,25 @@ class MenuManager {
         menu.addItem(tracksItem)
         menu.addItem(.separator())
 
-        // Equalizer submenu
+        // Equalizer submenu — 23 presets matching Movist Pro's set, all 10-band
+        // custom EQ values (see AudioEqualizerPreset.all in VLCPlayerEngine.swift).
+        // Index 0 = Off (disables EQ), 1..N = preset array index + 1.
         let eqItem = NSMenuItem(title: "Equalizer", action: nil, keyEquivalent: "")
         let eqMenu = NSMenu(title: "Equalizer")
         let currentEQ = UserDefaults.standard.integer(forKey: Defaults.defaultEQPreset)
-        for (i, preset) in ["Flat", "Bass Boost", "Treble Boost", "Vocal", "Rock", "Jazz", "Classical", "Electronic"].enumerated() {
-            let item = eqMenu.addItem(withTitle: preset, action: #selector(AppDelegate.setEQPreset(_:)), keyEquivalent: "")
-            if i == currentEQ { item.state = .on }
+
+        let offItem = eqMenu.addItem(withTitle: "Off",
+            action: #selector(AppDelegate.setEQPreset(_:)), keyEquivalent: "")
+        offItem.tag = 0
+        if currentEQ == 0 { offItem.state = .on }
+        eqMenu.addItem(.separator())
+
+        for (i, preset) in AudioEqualizerPreset.all.enumerated() {
+            let idx = i + 1
+            let item = eqMenu.addItem(withTitle: preset.name,
+                action: #selector(AppDelegate.setEQPreset(_:)), keyEquivalent: "")
+            item.tag = idx
+            if idx == currentEQ { item.state = .on }
         }
         eqItem.submenu = eqMenu
         menu.addItem(eqItem)
@@ -708,6 +883,8 @@ class MenuManager {
     private static func createSubtitleMenu() -> NSMenuItem {
         let menuItem = NSMenuItem(title: "Subtitle", action: nil, keyEquivalent: "")
         let menu = NSMenu(title: "Subtitle")
+        // Delegate keeps the background-opacity slider synced to UserDefaults on open
+        menu.delegate = SubtitleMenuDelegate.shared
 
         // Tracks section (dynamically populated)
         let tracksItem = NSMenuItem(title: "Subtitle Track", action: nil, keyEquivalent: "")
@@ -726,6 +903,57 @@ class MenuManager {
         }
         displayItem.submenu = displayMenu
         menu.addItem(displayItem)
+
+        // Text Color submenu — full HTML/CSS 16-color palette (matches VLC).
+        // Writes to UserDefaults; SubtitleOverlayView KVO picks it up live.
+        let textColorItem = NSMenuItem(title: "Text Color", action: nil, keyEquivalent: "")
+        let textColorMenu = NSMenu(title: "Text Color")
+        let currentTextColor = UserDefaults.standard.integer(forKey: Defaults.subtitleColor)
+        for (i, entry) in SubtitleOverlayView.namedColors.enumerated() {
+            let item = textColorMenu.addItem(withTitle: entry.name,
+                action: #selector(AppDelegate.setSubtitleTextColor(_:)), keyEquivalent: "")
+            item.tag = i
+            item.image = SubtitleOverlayView.swatchImage(for: entry.color)
+            if i == currentTextColor { item.state = .on }
+        }
+        textColorItem.submenu = textColorMenu
+        menu.addItem(textColorItem)
+
+        // Outline Thickness submenu
+        let outlineItem = NSMenuItem(title: "Outline Thickness", action: nil, keyEquivalent: "")
+        let outlineMenu = NSMenu(title: "Outline Thickness")
+        let currentOutline = UserDefaults.standard.integer(forKey: Defaults.subtitleOutlineThickness)
+        for thickness in 0...6 {
+            let title = thickness == 0 ? "None" : "\(thickness) px"
+            let item = outlineMenu.addItem(withTitle: title, action: #selector(AppDelegate.setSubtitleOutlineThickness(_:)), keyEquivalent: "")
+            item.tag = thickness
+            if thickness == currentOutline { item.state = .on }
+        }
+        outlineItem.submenu = outlineMenu
+        menu.addItem(outlineItem)
+
+        menu.addItem(.separator())
+
+        // Inline Background Opacity slider (VLC-style)
+        let opacityItem = NSMenuItem()
+        opacityItem.view = SubtitleOpacitySliderView.shared
+        menu.addItem(opacityItem)
+
+        // Background Color submenu — same HTML/CSS 16-color palette as Text Color
+        let bgColorItem = NSMenuItem(title: "Background Color", action: nil, keyEquivalent: "")
+        let bgColorMenu = NSMenu(title: "Background Color")
+        let currentBgColor = UserDefaults.standard.integer(forKey: Defaults.subtitleBackgroundColor)
+        for (i, entry) in SubtitleOverlayView.namedColors.enumerated() {
+            let item = bgColorMenu.addItem(withTitle: entry.name,
+                action: #selector(AppDelegate.setSubtitleBackgroundColor(_:)), keyEquivalent: "")
+            item.tag = i
+            item.image = SubtitleOverlayView.swatchImage(for: entry.color)
+            if i == currentBgColor { item.state = .on }
+        }
+        bgColorItem.submenu = bgColorMenu
+        menu.addItem(bgColorItem)
+
+        menu.addItem(.separator())
 
         // Hide Subtitles
         let hide = menu.addItem(withTitle: "Hide Subtitles", action: #selector(AppDelegate.toggleSubtitles(_:)), keyEquivalent: "v")
