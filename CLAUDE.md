@@ -112,6 +112,34 @@ Vendor/
 - `ENABLE_USER_SCRIPT_SANDBOXING` must be `NO` or build scripts can't access `Vendor/` directory
 - Bundled FFmpeg dylibs must use `@rpath` for inter-library deps, not absolute paths. If a freshly built/downloaded dylib has its install ID as `@rpath/...` but references siblings via an absolute build-machine path (visible in `otool -L`), the app will crash at launch with `dyld: Library not loaded` on any other machine. Patch with `install_name_tool -change /abs/path/libfoo.X.dylib @rpath/libfoo.X.Y.Z.dylib <dylib>` for each bad dep, then `codesign --force --sign - <dylib>` to restore the ad-hoc signature. The build script only copies fully-versioned files (e.g. `libavcodec.61.19.101.dylib`), so the `@rpath` target must be the fully-versioned name, not the major-only soname
 
+### Casting Dolby Vision to non-DV TVs (Samsung etc.)
+
+- Three transport paths exist; only DLNA preserves color for DV content on non-DV TVs:
+  - **AVKit AirPlay** (AVRoutePickerView/AVPlayer): silently fails against Samsung's third-party AirPlay 2 receiver — session opens, "Connected to MacBook" banner shows, but media never flows. Works fine for Apple TV.
+  - **libvlc chromecast renderer**: works *from VLC.app* against Samsung TVs (the receiver is discovered as type=chromecast via Samsung's Cast-flavored mDNS), but the sout chain re-encodes HEVC HDR10 → H.264 SDR — colors are wrong on TV. Also fails to push from our process despite identical libvlc/plugins/permissions; root cause never identified, abandoned this path.
+  - **DLNA push** (`DLNAManager` + `CastingHTTPServer`): works. Samsung TVs decode HEVC HDR10 natively when served via DLNA AVTransport. This is the path the DV AirPlay flow uses.
+- DV pipeline: `HDRTranscoder` spawns the bundled `Vendor/ffmpeg-cli/bin/ffmpeg` with `libplacebo=...:apply_dolbyvision=true` (default true, this is the option name; `apply_dovi` was renamed long ago) → `hevc_videotoolbox` 25 Mbps HDR10 → `CastingHTTPServer` serves the result → `DLNAManager.loadMedia()` issues SetAVTransportURI + Play.
+- `Vendor/ffmpeg-cli/` bundles ffmpeg (built from FFmpeg 7.1 with `--enable-libplacebo --enable-videotoolbox`) + libplacebo + Vulkan loader + MoltenVK + lcms2 + shaderc + a MoltenVK ICD JSON. `HDRTranscoder` sets `VK_ICD_FILENAMES` to the bundled ICD path before spawning. The ICD JSON's `library_path` is `../../../lib/libMoltenVK.dylib` — only resolves correctly if the JSON sits at `<bundle>/etc/vulkan/icd.d/MoltenVK_icd.json` and MoltenVK at `<bundle>/lib/`, so the directory layout matters.
+- Samsung TVs don't support Dolby Vision at all — they only decode HDR10/HDR10+/HLG. Always tone-map DV → HDR10 before pushing; preserving DV signaling on the output is pointless and may confuse some receivers.
+
+### DLNA discovery/control quirks (DLNAManager)
+
+- SSDP M-SEARCH MUST use BSD sockets (`socket` + `sendto` + `recvfrom`), not `NWConnection`. NWConnection's UDP "connection" is bound to the destination endpoint (the multicast group 239.255.255.250 in this case) and silently drops the unicast responses that come back from the device's own IP. This was the actual reason DLNAManager appeared "discovered nothing" against any device.
+- `fetchDeviceDescription` must use the `LOCATION:` URL from the SSDP advertisement, not a hardcoded path. Samsung Smart TVs use `/dmr` (e.g. `http://10.0.0.126:9197/dmr`); other vendors use `/xml/device_description.xml`, `/description.xml`, etc. `CastDevice` carries `descriptionURL` populated from the SSDP response.
+- When parsing the description XML, walk `<service>` blocks looking for one whose `<serviceType>` contains `AVTransport`. Naively grabbing the first `<controlURL>` picks RenderingControl on Samsung (declared first), which doesn't understand SetAVTransportURI.
+- `DLNAManager.loadMedia(url:on:)` auto-chains `fetchDeviceDescription` if `controlURL` is nil — `connect()`'s URL fetch is async, so callers that call `connect()` then immediately `loadMedia()` would otherwise hit a nil-controlURL silent return.
+- `CastingHTTPServer` must emit `transferMode.dlna.org: Streaming` and a non-empty `contentFeatures.dlna.org` header on the file response, or Samsung MediaRenderer rejects/ignores the URL. The `DLNA.ORG_OP=01` flag opts into both seek-by-time and seek-by-byte.
+
+### AirPlay button click routing (CastButton)
+
+- `AVRoutePickerView` doesn't expose its picker open as an action target; it captures `mouseDown` via private tracking-area machinery that bypasses sibling overlay views (an `NSView` placed on top of the picker doesn't reliably win hit testing — its `mouseDown` never fires even with `acceptsFirstMouse` and custom `hitTest`). To intercept clicks for the DV/libvlc path, `CastButton` switches between two implementations: `AVRoutePickerView` for the native AVKit path, and a plain `NSButton` with the `airplayvideo` SF Symbol for the DV path. `setMode(.customHandler)` tears down the picker view entirely.
+- `AVPlayerEngine.allowsExternalPlayback` is now a configurable property (default `true`). DV files set it to `false` so AVKit doesn't auto-engage external playback when an AirPlay route is system-active (which would blank the local video and show a "Playing on TV" placeholder that never actually streams).
+
+### Misc gotchas hit during DV work
+
+- A traced/stopped process (Xcode debugger attached) can't be terminated via `kill -9`. The `ps` `STAT` column shows `SX`. Users must quit Xcode or detach the debugger; shell-level kills do nothing.
+- `dovi_tool -m 2/3 convert` only rewrites RPU metadata to claim Profile 8.1; it doesn't transcode the IPT-PQ base layer pixels to BT.2020-PQ. AVPlayer/AppleTV don't apply the RPU's color transform when they see a P8.1 file, so the relabeled file plays with the same wrong colors as the original P5. The only working approach is full pixel transcode via libplacebo, which does apply the RPU per-frame.
+
 ### Git Repository
 - Repo: https://github.com/zhaomin1995/video_player
 - Branch: main
