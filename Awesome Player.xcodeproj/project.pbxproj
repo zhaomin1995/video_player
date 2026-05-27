@@ -47,6 +47,7 @@
 		E55EEC072FC230F3000EE159 /* AudioPassthroughManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55EEC062FC230F3000EE159 /* AudioPassthroughManager.swift */; };
 		A10081 /* VideoEQPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10081 /* VideoEQPanelController.swift */; };
 		A10082 /* MediaInspectorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10082 /* MediaInspectorController.swift */; };
+		A10100 /* ConvertStreamWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10100 /* ConvertStreamWindowController.swift */; };
 		A10090 /* KeyBindingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10090 /* KeyBindingManager.swift */; };
 /* End PBXBuildFile section */
 
@@ -94,6 +95,7 @@
 		F10070 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		F10081 /* VideoEQPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoEQPanelController.swift; sourceTree = "<group>"; };
 		F10082 /* MediaInspectorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaInspectorController.swift; sourceTree = "<group>"; };
+		F10100 /* ConvertStreamWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvertStreamWindowController.swift; sourceTree = "<group>"; };
 		F10090 /* KeyBindingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyBindingManager.swift; sourceTree = "<group>"; };
 		F10099 /* Awesome Player.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Awesome Player.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -220,6 +222,7 @@
 				D6342BFA0000000000000001 /* PlaylistPanelView.swift */,
 				F10081 /* VideoEQPanelController.swift */,
 				F10082 /* MediaInspectorController.swift */,
+				F10100 /* ConvertStreamWindowController.swift */,
 			);
 			path = Player;
 			sourceTree = "<group>";
@@ -435,6 +438,7 @@
 				A10070 /* WelcomeView.swift in Sources */,
 				A10081 /* VideoEQPanelController.swift in Sources */,
 				A10082 /* MediaInspectorController.swift in Sources */,
+				A10100 /* ConvertStreamWindowController.swift in Sources */,
 				A10090 /* KeyBindingManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
