@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		A10014 /* AVPlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10014 /* AVPlayerEngine.swift */; };
 		A10080 /* VLCPlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10080 /* VLCPlayerEngine.swift */; };
-		A10091 /* HDRTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10091 /* HDRTranscoder.swift */; };
 		A10001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10001 /* AppDelegate.swift */; };
 		A10005 /* AudioPassthrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10005 /* AudioPassthrough.swift */; };
 		A10009 /* MediaInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10009 /* MediaInfo.swift */; };
@@ -54,7 +53,6 @@
 /* Begin PBXFileReference section */
 		F10014 /* AVPlayerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerEngine.swift; sourceTree = "<group>"; };
 		F10080 /* VLCPlayerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLCPlayerEngine.swift; sourceTree = "<group>"; };
-		F10091 /* HDRTranscoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDRTranscoder.swift; sourceTree = "<group>"; };
 		E55EEC062FC230F3000EE159 /* AudioPassthroughManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPassthroughManager.swift; sourceTree = "<group>"; };
 		F10001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		F10005 /* AudioPassthrough.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPassthrough.swift; sourceTree = "<group>"; };
@@ -152,7 +150,6 @@
 				D6342BF8EECB4E2C93F2FBA9 /* ResumeManager.swift */,
 				F10014 /* AVPlayerEngine.swift */,
 				F10080 /* VLCPlayerEngine.swift */,
-				F10091 /* HDRTranscoder.swift */,
 			);
 			path = Player;
 			sourceTree = "<group>";
@@ -374,10 +371,6 @@
 				"$(PROJECT_DIR)/Vendor/libvlc/lib/libvlc.5.dylib",
 				"$(PROJECT_DIR)/Vendor/libvlc/lib/libvlccore.9.dylib",
 				"$(PROJECT_DIR)/Vendor/yt-dlp/yt-dlp_macos",
-				"$(PROJECT_DIR)/Vendor/ffmpeg-cli/bin/ffmpeg",
-				"$(PROJECT_DIR)/Vendor/ffmpeg-cli/lib/libplacebo.360.dylib",
-				"$(PROJECT_DIR)/Vendor/ffmpeg-cli/lib/libMoltenVK.dylib",
-				"$(PROJECT_DIR)/Vendor/ffmpeg-cli/etc/vulkan/icd.d/MoltenVK_icd.json",
 			);
 			name = "Copy FFmpeg Dylibs";
 			outputPaths = (
@@ -390,14 +383,10 @@
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/lib/libvlc.5.dylib",
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/lib/libvlccore.9.dylib",
 				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/yt-dlp/yt-dlp_macos",
-				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/ffmpeg-cli/bin/ffmpeg",
-				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/ffmpeg-cli/lib/libplacebo.360.dylib",
-				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/ffmpeg-cli/lib/libMoltenVK.dylib",
-				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/Contents/Resources/ffmpeg-cli/etc/vulkan/icd.d/MoltenVK_icd.json",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "# Copy app icon\ncp -f \"${PROJECT_DIR}/Awesome Player/App/AppIcon.icns\" \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/AppIcon.icns\" 2>/dev/null || true\n\n# Copy FFmpeg dylibs (used by FFmpegBridge at link time)\nmkdir -p \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nfor dylib in libavformat libavcodec libavutil libswresample libswscale; do\n    SRC=$(find \"${PROJECT_DIR}/Vendor/ffmpeg/lib\" -name \"${dylib}.*.*.*.dylib\" -not -type l | head -1)\n    [ -n \"$SRC\" ] && cp -f \"$SRC\" \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/\"\ndone\n\n# Copy libvlc dylibs\nmkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/lib\"\ncp -f \"${PROJECT_DIR}/Vendor/libvlc/lib/\"*.dylib \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/lib/\" 2>/dev/null || true\n\n# Copy VLC plugins\nif [ -d \"${PROJECT_DIR}/Vendor/libvlc/plugins\" ]; then\n    mkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/plugins\"\n    cp -Rf \"${PROJECT_DIR}/Vendor/libvlc/plugins/\"* \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/plugins/\" 2>/dev/null || true\nfi\n\n# Copy yt-dlp distribution\nif [ -f \"${PROJECT_DIR}/Vendor/yt-dlp/yt-dlp_macos\" ]; then\n    YTDLP_DIR=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/yt-dlp\"\n    mkdir -p \"$YTDLP_DIR\"\n    cp -Rf \"${PROJECT_DIR}/Vendor/yt-dlp/\"* \"$YTDLP_DIR/\"\n    chmod +x \"$YTDLP_DIR/yt-dlp_macos\"\nfi\n\n# Copy ffmpeg CLI sidecar (binary + libplacebo + Vulkan/MoltenVK).\n# Used at runtime for DV → HDR10 transcoding before AirPlay/Cast.\n# Preserves bin/lib/etc layout so the ICD JSON's relative path to MoltenVK\n# resolves correctly, and the binary's @executable_path/../lib rpath works.\nif [ -d \"${PROJECT_DIR}/Vendor/ffmpeg-cli\" ]; then\n    FFCLI_DIR=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/ffmpeg-cli\"\n    mkdir -p \"$FFCLI_DIR\"\n    cp -Rf \"${PROJECT_DIR}/Vendor/ffmpeg-cli/\"* \"$FFCLI_DIR/\"\n    chmod +x \"$FFCLI_DIR/bin/ffmpeg\"\nfi\n";
+			shellScript = "# Copy app icon\ncp -f \"${PROJECT_DIR}/Awesome Player/App/AppIcon.icns\" \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/AppIcon.icns\" 2>/dev/null || true\n\n# Copy FFmpeg dylibs (used by FFmpegBridge at link time)\nmkdir -p \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nfor dylib in libavformat libavcodec libavutil libswresample libswscale; do\n    SRC=$(find \"${PROJECT_DIR}/Vendor/ffmpeg/lib\" -name \"${dylib}.*.*.*.dylib\" -not -type l | head -1)\n    [ -n \"$SRC\" ] && cp -f \"$SRC\" \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/\"\ndone\n\n# Copy libvlc dylibs\nmkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/lib\"\ncp -f \"${PROJECT_DIR}/Vendor/libvlc/lib/\"*.dylib \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/lib/\" 2>/dev/null || true\n\n# Copy VLC plugins\nif [ -d \"${PROJECT_DIR}/Vendor/libvlc/plugins\" ]; then\n    mkdir -p \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/plugins\"\n    cp -Rf \"${PROJECT_DIR}/Vendor/libvlc/plugins/\"* \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/plugins/\" 2>/dev/null || true\nfi\n\n# Copy yt-dlp distribution\nif [ -f \"${PROJECT_DIR}/Vendor/yt-dlp/yt-dlp_macos\" ]; then\n    YTDLP_DIR=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/yt-dlp\"\n    mkdir -p \"$YTDLP_DIR\"\n    cp -Rf \"${PROJECT_DIR}/Vendor/yt-dlp/\"* \"$YTDLP_DIR/\"\n    chmod +x \"$YTDLP_DIR/yt-dlp_macos\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -418,7 +407,6 @@
 				D6342BFB0000000000000002 /* PlaylistPanelView.swift in Sources */,
 				A10014 /* AVPlayerEngine.swift in Sources */,
 				A10080 /* VLCPlayerEngine.swift in Sources */,
-				A10091 /* HDRTranscoder.swift in Sources */,
 				E55EEC072FC230F3000EE159 /* AudioPassthroughManager.swift in Sources */,
 				A10018 /* CastButton.swift in Sources */,
 				A10019 /* ControlBarView.swift in Sources */,

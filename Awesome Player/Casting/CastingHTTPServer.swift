@@ -67,12 +67,8 @@ class CastingHTTPServer {
             return
         }
 
-        guard let fileSize = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? UInt64 else {
-            sendErrorResponse(connection: connection, status: 404)
-            return
-        }
-
-        guard fileSize > 0 else {
+        guard let fileSize = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? UInt64,
+              fileSize > 0 else {
             sendErrorResponse(connection: connection, status: 404)
             return
         }
@@ -109,8 +105,8 @@ class CastingHTTPServer {
         headers += "Accept-Ranges: bytes\r\n"
         headers += "Access-Control-Allow-Origin: *\r\n"
         // DLNA hints — Samsung MediaRenderers ignore the file without these.
-        // PN profile is informational; clients that don't recognize it fall
-        // back to header sniffing. OP=01 = both seek-by-time and seek-by-byte.
+        // OP=01 = both byte-seek and time-seek supported; the flags are the
+        // standard fixed-size streamable profile.
         headers += "transferMode.dlna.org: Streaming\r\n"
         headers += "contentFeatures.dlna.org: DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000\r\n"
 

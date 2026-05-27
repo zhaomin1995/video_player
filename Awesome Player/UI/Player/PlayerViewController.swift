@@ -42,16 +42,6 @@ class PlayerViewController: NSViewController {
     private var currentFileIsDolbyVision = false
     private(set) var chapters: [[String: Any]] = []
 
-    // DV → HDR10 transcode + libvlc renderer flow (Path B for AirPlay).
-    // Used when the user clicks AirPlay on a Dolby Vision file: we transcode
-    // to plain HDR10 via bundled ffmpeg+libplacebo, then push via libvlc
-    // renderer (same path VLC.app uses), bypassing AVKit's flaky AirPlay 2
-    // handshake with Samsung receivers.
-    private var hdrTranscoder: HDRTranscoder?
-    private var pendingDLNADevice: CastDevice?
-    private var transcodedAirPlayFileURL: URL?
-    private var dvDeviceMenuItems: [CastDevice] = []
-
     var isPaused: Bool {
         if let vlc = vlcEngine { return !vlc.isPlaying }
         return (playerEngine?.player?.rate ?? 0) == 0
@@ -386,10 +376,6 @@ class PlayerViewController: NSViewController {
         videoView.setLayerTransform(CATransform3DIdentity)
         chapters = []
         currentFileIsDolbyVision = false
-        hdrTranscoder?.cancel()
-        hdrTranscoder = nil
-        pendingDLNADevice = nil
-        cleanupTranscodedFile()
         playbackStatusObservation = nil
         welcomeView.isHidden = true
         controlBarView.setVideoActive(true)
@@ -1232,13 +1218,14 @@ extension PlayerViewController: ControlBarDelegate {
             return
         }
 
-        // Dolby Vision route: AVKit AirPlay handshake fails against Samsung
-        // (and some other) AirPlay 2 receivers, and libvlc's chromecast
-        // renderer re-encodes the stream to H.264 SDR (wrong colors on TV).
-        // Instead, transcode DV→HDR10 with libplacebo and push the file to
-        // a DLNA MediaRenderer — Samsung Smart TVs decode HEVC HDR10 natively.
+        // Dolby Vision casting isn't supported: AVKit AirPlay silently fails
+        // against Samsung's AirPlay 2 receiver, libvlc chromecast re-encodes
+        // to SDR (wrong colors), and DLNA only accepts plain MP4 with moov at
+        // the start — which can only be produced by a full offline transcode.
+        // See CLAUDE.md "Dolby Vision casting (currently unsupported)" for
+        // the full investigation and revival path.
         if playerEngine != nil, currentFileIsDolbyVision {
-            startAirPlayDVFlow()
+            osdView.show(message: "Casting Dolby Vision isn't supported. Play locally instead.", duration: 4.0)
             return
         }
 
@@ -1259,117 +1246,6 @@ extension PlayerViewController: ControlBarDelegate {
             return
         }
         showRendererMenu(renderers: renderers)
-    }
-
-    // MARK: - DV AirPlay flow (transcode → DLNA push)
-
-    /// Entry point when the user clicks AirPlay on a Dolby Vision file.
-    /// Kicks off DLNA discovery via CastingManager, lets the user pick a
-    /// receiver, then transcodes DV→HDR10 and pushes via DLNA.
-    private func startAirPlayDVFlow() {
-        guard currentFileURL != nil else { return }
-        guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
-
-        appDelegate.castingManager.startDiscovery()
-        osdView.show(message: "Searching for devices…", duration: 5.0)
-
-        // SSDP search is one-shot UDP — wait for responses to come back.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            guard let self = self else { return }
-            // Filter to receivers that decode HEVC HDR10 natively. Chromecast
-            // re-encodes to H.264 SDR (wrong colors); we want DLNA only.
-            let candidates = appDelegate.castingManager.discoveredDevices.filter { $0.type == .dlna }
-            if candidates.isEmpty {
-                self.osdView.show(message: "No DLNA-capable TV found. Enable Smart View / DLNA on your TV.", duration: 5.0)
-                return
-            }
-            self.showDVDevicePicker(devices: candidates)
-        }
-    }
-
-    private func showDVDevicePicker(devices: [CastDevice]) {
-        dvDeviceMenuItems = devices
-        let menu = NSMenu(title: "AirPlay")
-        for (i, d) in devices.enumerated() {
-            let item = NSMenuItem(title: d.name, action: #selector(dvDevicePicked(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = i
-            menu.addItem(item)
-        }
-        let buttonFrame = controlBarView.castButtonFrameInWindow()
-        let localPoint = view.convert(NSPoint(x: buttonFrame.midX, y: buttonFrame.maxY + 4), from: nil)
-        menu.popUp(positioning: nil, at: localPoint, in: view)
-    }
-
-    @objc private func dvDevicePicked(_ sender: NSMenuItem) {
-        let idx = sender.tag
-        guard idx >= 0, idx < dvDeviceMenuItems.count,
-              let url = currentFileURL else { return }
-        let device = dvDeviceMenuItems[idx]
-        pendingDLNADevice = device
-        beginDVTranscodeForDLNA(input: url, target: device)
-    }
-
-    /// Transcode DV → HDR10 via libplacebo, then ask CastingManager to push
-    /// the result to the picked DLNA device (it spins up CastingHTTPServer
-    /// and issues SetAVTransportURI + Play under the hood).
-    private func beginDVTranscodeForDLNA(input: URL, target: CastDevice) {
-        hdrTranscoder?.cancel()
-        cleanupTranscodedFile()
-
-        let transcoder = HDRTranscoder()
-        hdrTranscoder = transcoder
-
-        osdView.show(message: "Preparing for AirPlay to \(target.name)… 0%", duration: 60 * 60)
-
-        transcoder.onProgress = { [weak self] p in
-            let pct = Int(p * 100)
-            self?.osdView.show(message: "Preparing for AirPlay to \(target.name)… \(pct)%", duration: 60 * 60)
-        }
-
-        transcoder.onCompletion = { [weak self] result in
-            guard let self = self else { return }
-            self.hdrTranscoder = nil
-            switch result {
-            case .success(let outputURL):
-                self.transcodedAirPlayFileURL = outputURL
-                self.pushTranscodedFileToDLNA(file: outputURL, device: target)
-            case .failure(.cancelled):
-                self.osdView.show(message: "AirPlay preparation cancelled", duration: 2.0)
-            case .failure(.ffmpegNotBundled):
-                self.osdView.show(message: "AirPlay preparation failed: bundled ffmpeg missing", duration: 4.0)
-            case .failure(.launchFailed(let err)):
-                self.osdView.show(message: "AirPlay preparation failed: \(err.localizedDescription)", duration: 4.0)
-            case .failure(.exitedNonZero(let code, let tail)):
-                print("[HDRTranscoder] ffmpeg exit \(code):\n\(tail)")
-                self.osdView.show(message: "AirPlay preparation failed (ffmpeg \(code))", duration: 4.0)
-            }
-        }
-
-        switch transcoder.start(input: input) {
-        case .success:
-            break
-        case .failure(.ffmpegNotBundled):
-            osdView.show(message: "Bundled ffmpeg missing — rebuild from source", duration: 5.0)
-            hdrTranscoder = nil
-        case .failure(let err):
-            osdView.show(message: "Couldn't start transcode: \(err)", duration: 4.0)
-            hdrTranscoder = nil
-        }
-    }
-
-    private func pushTranscodedFileToDLNA(file: URL, device: CastDevice) {
-        guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
-        appDelegate.castingManager.connect(to: device)
-        appDelegate.castingManager.cast(fileURL: file, to: device)
-        osdView.show(message: "AirPlay: \(device.name)", duration: 3.0)
-    }
-
-    private func cleanupTranscodedFile() {
-        if let url = transcodedAirPlayFileURL {
-            try? FileManager.default.removeItem(at: url)
-            transcodedAirPlayFileURL = nil
-        }
     }
 
     private func showRendererMenu(renderers: [VLCPlayerEngine.RendererInfo]) {
