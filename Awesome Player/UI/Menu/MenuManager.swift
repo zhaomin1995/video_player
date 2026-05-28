@@ -641,12 +641,14 @@ class MenuManager {
     }
 
     private static func createEditMenu() -> NSMenuItem {
+        // Undo / Redo were dropped: nothing in the player has an undo stack,
+        // and dialog text fields are too short for ⌘Z to be meaningful. Cut /
+        // Copy / Paste / Select All stay because their keyboard shortcuts
+        // are routed via the main menu, so without them users can't paste
+        // into the Open URL / Jump to Time / Convert/Stream text fields.
         let menuItem = NSMenuItem(title: L("Edit"), action: nil, keyEquivalent: "")
         let menu = NSMenu(title: L("Edit"))
 
-        menu.addItem(withTitle: L("Undo"), action: Selector(("undo:")), keyEquivalent: "z")
-        menu.addItem(withTitle: L("Redo"), action: Selector(("redo:")), keyEquivalent: "Z")
-        menu.addItem(.separator())
         menu.addItem(withTitle: L("Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         menu.addItem(withTitle: L("Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         menu.addItem(withTitle: L("Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
