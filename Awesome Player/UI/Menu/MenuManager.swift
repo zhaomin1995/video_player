@@ -596,6 +596,60 @@ class SubtitleMenuDelegate: NSObject, NSMenuDelegate {
     }
 }
 
+/// Strips the AppKit-injected items (AutoFill, Start Dictation, Emoji &
+/// Symbols) that macOS automatically adds to any menu it detects as the
+/// "Edit menu" (i.e. any menu containing cut:/copy:/paste: items). None of
+/// those three items make sense for a video player — the dialog text fields
+/// only hold URLs and timecodes. Matches by stable selector name where
+/// possible, and by localized title substring for AutoFill (whose parent
+/// item has no public selector we can match against).
+class EditMenuDelegate: NSObject, NSMenuDelegate {
+    static let shared = EditMenuDelegate()
+
+    /// Public AppKit selectors AppKit auto-attaches to the injected items.
+    /// Matching by selector survives any locale change.
+    private let unwantedSelectorNames: Set<String> = [
+        "orderFrontCharacterPalette:",   // Emoji & Symbols (⌃⌘Space)
+        "startDictation:",                // Start Dictation
+    ]
+
+    /// AutoFill's parent item has action == nil (it's a submenu container)
+    /// so selector matching doesn't reach it. Fall back to localized title
+    /// substrings across our supported locales.
+    private let autoFillTitleSubstrings: [String] = [
+        "AutoFill", "Autofill",
+        "自动填充", "自動填寫", "自動填入",   // zh-Hans, zh-Hant, yue alt
+        "自動入力",                            // ja
+        "자동 완성", "자동완성",               // ko
+        "Rellenar", "Autorrelleno",            // es
+        "Remplir", "Saisie",                   // fr
+        "Ausfüllen", "Autoausfüllen",          // de
+        "Preencher", "Preenchimento",          // pt-BR
+        "Автозаполнение",                      // ru
+    ]
+
+    func menuNeedsUpdate(_ menu: NSMenu) { strip(menu) }
+    func menuWillOpen(_ menu: NSMenu) { strip(menu) }
+
+    private func strip(_ menu: NSMenu) {
+        for item in menu.items.reversed() {
+            if let action = item.action,
+               unwantedSelectorNames.contains(NSStringFromSelector(action)) {
+                menu.removeItem(item)
+                continue
+            }
+            if item.submenu != nil,
+               autoFillTitleSubstrings.contains(where: { item.title.localizedCaseInsensitiveContains($0) }) {
+                menu.removeItem(item)
+            }
+        }
+        // Drop any orphaned trailing separator left behind by the removals
+        while let last = menu.items.last, last.isSeparatorItem {
+            menu.removeItem(last)
+        }
+    }
+}
+
 class MenuManager {
     static func setupMainMenu() {
         let mainMenu = NSMenu()
@@ -646,8 +700,13 @@ class MenuManager {
         // Copy / Paste / Select All stay because their keyboard shortcuts
         // are routed via the main menu, so without them users can't paste
         // into the Open URL / Jump to Time / Convert/Stream text fields.
+        //
+        // EditMenuDelegate strips the AppKit-injected AutoFill / Start
+        // Dictation / Emoji & Symbols items that macOS auto-attaches to any
+        // menu containing cut:/copy:/paste: items — none make sense here.
         let menuItem = NSMenuItem(title: L("Edit"), action: nil, keyEquivalent: "")
         let menu = NSMenu(title: L("Edit"))
+        menu.delegate = EditMenuDelegate.shared
 
         menu.addItem(withTitle: L("Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         menu.addItem(withTitle: L("Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
