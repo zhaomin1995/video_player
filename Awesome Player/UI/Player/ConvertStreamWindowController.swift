@@ -11,6 +11,8 @@
 /// scan cost (~50ms).
 import Cocoa
 import UniformTypeIdentifiers
+import Darwin
+import IOKit
 
 struct ConvertProfile {
     let name: String
@@ -63,6 +65,7 @@ class ConvertStreamWindowController: NSWindowController {
     private let goButton = NSButton(title: L("Go!"), target: nil, action: nil)
     private let progressBar = NSProgressIndicator()
     private let statusLabel = NSTextField(labelWithString: "")
+    private let usageLabel = NSTextField(labelWithString: "")
 
     /// libvlc handles for the in-flight conversion. nil when idle.
     private var converterPlayer: OpaquePointer?
@@ -158,6 +161,10 @@ class ConvertStreamWindowController: NSWindowController {
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         statusLabel.font = .systemFont(ofSize: 11)
         statusLabel.textColor = .secondaryLabelColor
+        usageLabel.translatesAutoresizingMaskIntoConstraints = false
+        usageLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        usageLabel.textColor = .tertiaryLabelColor
+        usageLabel.isHidden = true
 
         goButton.bezelStyle = .rounded
         goButton.keyEquivalent = "\r"
@@ -166,7 +173,7 @@ class ConvertStreamWindowController: NSWindowController {
         goButton.isEnabled = false
         goButton.translatesAutoresizingMaskIntoConstraints = false
 
-        [dropBox, profileBox, destBox, progressBar, statusLabel, goButton].forEach {
+        [dropBox, profileBox, destBox, progressBar, statusLabel, usageLabel, goButton].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             contentView.addSubview($0)
         }
@@ -215,10 +222,13 @@ class ConvertStreamWindowController: NSWindowController {
             statusLabel.topAnchor.constraint(equalTo: progressBar.bottomAnchor, constant: 4),
             statusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             statusLabel.trailingAnchor.constraint(lessThanOrEqualTo: goButton.leadingAnchor, constant: -12),
-            // Hard bottom margin so the status text sits 20pt above the
-            // window edge instead of hovering right against it (previously
-            // it had no bottom anchor and ended up flush with the border).
-            statusLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+
+            // CPU/GPU usage row sits below the Converting/ETA line during a
+            // running conversion; hidden when idle.
+            usageLabel.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 2),
+            usageLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            usageLabel.trailingAnchor.constraint(lessThanOrEqualTo: goButton.leadingAnchor, constant: -12),
+            usageLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
 
             goButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
             goButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
@@ -336,6 +346,8 @@ class ConvertStreamWindowController: NSWindowController {
         progressBar.isHidden = false
         progressBar.doubleValue = 0
         statusLabel.stringValue = L("Converting…")
+        usageLabel.isHidden = false
+        usageLabel.stringValue = ""
 
         progressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.tickProgress()
@@ -358,6 +370,19 @@ class ConvertStreamWindowController: NSWindowController {
                 let eta = elapsed / pos - elapsed
                 statusLabel.stringValue = String(format: L("Converting %.0f%%  •  ETA %.0fs"), pos * 100, eta)
             }
+            updateUsageLabel()
+        }
+    }
+
+    private func updateUsageLabel() {
+        let cpu = SystemUsageSampler.currentProcessCPUPercent()
+        let cpuText = String(format: L("CPU %.0f%%"), cpu)
+        if let gpu = SystemUsageSampler.currentGPUPercent() {
+            usageLabel.stringValue = "\(cpuText)  •  " + String(format: L("GPU %.0f%%"), gpu)
+        } else {
+            // No IOAccelerator service exposed a utilization figure — still
+            // show CPU, just omit the GPU half rather than printing N/A.
+            usageLabel.stringValue = cpuText
         }
     }
 
@@ -387,6 +412,7 @@ class ConvertStreamWindowController: NSWindowController {
         }
 
         progressBar.isHidden = true
+        usageLabel.isHidden = true
         if success, let out = pendingOutputURL {
             statusLabel.stringValue = "Saved to \(out.lastPathComponent)"
             let alert = NSAlert()
@@ -442,5 +468,95 @@ class ConvertDropZoneView: NSView {
               let url = urls.first else { return false }
         onFileDropped?(url)
         return true
+    }
+}
+
+// MARK: - System Usage Sampler
+
+/// Samples our process's CPU usage and the system's GPU usage. Used by the
+/// Convert/Stream window to show what the running transcode is costing.
+///
+/// CPU: walks our process's threads via `task_threads()` + `thread_info()`
+/// and sums their `cpu_usage` field. This is what `top` reports under the
+/// "%CPU" column for a process — total time spent on the CPU since the last
+/// sample, normalized to per-second. Divided by core count so 100% means
+/// "saturating all cores" instead of "saturating one core".
+///
+/// GPU: walks the IORegistry for "IOAccelerator"-class services (this is
+/// what Activity Monitor's "GPU History" uses too — fully public IOKit API,
+/// no private SPI). Reads the service's `PerformanceStatistics` dictionary,
+/// which on both Intel and Apple Silicon Macs contains a "Device Utilization
+/// %" field that's the GPU's overall busy time. Several IOAccelerator
+/// services may exist (one per GPU on multi-GPU systems); we report the max.
+final class SystemUsageSampler {
+    /// Returns 0.0–100.0+ for the current process. 100% = one core saturated;
+    /// values > 100% are possible on multi-threaded workloads.
+    static func currentProcessCPUPercent() -> Double {
+        var threadList: thread_act_array_t?
+        var threadCount = mach_msg_type_number_t(0)
+        let r = task_threads(mach_task_self_, &threadList, &threadCount)
+        guard r == KERN_SUCCESS, let threadList else { return 0 }
+
+        defer {
+            let size = MemoryLayout<thread_t>.stride * Int(threadCount)
+            vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: threadList)), vm_size_t(size))
+        }
+
+        // THREAD_BASIC_INFO_COUNT isn't bridged to Swift; compute it
+        // from the struct size (it's the count of natural_t words).
+        let basicInfoCount = mach_msg_type_number_t(
+            MemoryLayout<thread_basic_info_data_t>.size / MemoryLayout<natural_t>.size
+        )
+
+        var total: Double = 0
+        for i in 0..<Int(threadCount) {
+            var info = thread_basic_info()
+            var count = basicInfoCount
+            let infoResult = withUnsafeMutablePointer(to: &info) {
+                $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { ptr in
+                    thread_info(threadList[i], thread_flavor_t(THREAD_BASIC_INFO), ptr, &count)
+                }
+            }
+            guard infoResult == KERN_SUCCESS, info.flags & TH_FLAGS_IDLE == 0 else { continue }
+            // cpu_usage is in 1/1000 of TH_USAGE_SCALE
+            total += Double(info.cpu_usage) / Double(TH_USAGE_SCALE) * 100.0
+        }
+        return total
+    }
+
+    /// Returns 0.0–100.0 for the busiest GPU in the system, or nil if no
+    /// IOAccelerator service was found (rare — would mean no GPU at all).
+    static func currentGPUPercent() -> Double? {
+        var iter: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault,
+                                            IOServiceMatching("IOAccelerator"),
+                                            &iter) == KERN_SUCCESS else {
+            return nil
+        }
+        defer { IOObjectRelease(iter) }
+
+        var maxUtil: Double = -1
+        while case let service = IOIteratorNext(iter), service != 0 {
+            defer { IOObjectRelease(service) }
+            var unmanagedProps: Unmanaged<CFMutableDictionary>?
+            guard IORegistryEntryCreateCFProperties(service, &unmanagedProps, kCFAllocatorDefault, 0) == KERN_SUCCESS,
+                  let props = unmanagedProps?.takeRetainedValue() as? [String: Any],
+                  let perf = props["PerformanceStatistics"] as? [String: Any] else { continue }
+
+            // Apple Silicon: "Device Utilization %"
+            // Intel: same key on most discrete + integrated GPUs
+            // Fallback: "GPU Activity(%)" on some older Intel drivers
+            let candidates = ["Device Utilization %", "GPU Activity(%)", "GPU Utilization %"]
+            for key in candidates {
+                if let v = perf[key] as? Int {
+                    maxUtil = max(maxUtil, Double(v))
+                    break
+                } else if let v = perf[key] as? Double {
+                    maxUtil = max(maxUtil, v)
+                    break
+                }
+            }
+        }
+        return maxUtil >= 0 ? maxUtil : nil
     }
 }
