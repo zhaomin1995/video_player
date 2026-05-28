@@ -16,23 +16,51 @@ class SubtitleManager {
         currentIndex = 0
     }
 
+    /// Called from the time-observer tick (~4×/s for AVPlayer, 1×/s for VLC).
+    /// Hot path: avoid linear scan when the user is scrubbing through an ASS
+    /// file with thousands of cues.
+    ///
+    /// Strategy:
+    ///   1. Fast path — the playhead is usually inside `currentIndex` or
+    ///      its immediate neighbours (normal monotonic playback). Probe
+    ///      currentIndex, then ±1. O(1) for ~99% of ticks.
+    ///   2. Fall back to binary search over `entries` sorted by startTime
+    ///      (SubtitleParser already returns them sorted). O(log n).
     func subtitle(at time: TimeInterval) -> SubtitleEntry? {
         let adjustedTime = time + delay
+        guard !entries.isEmpty else { return nil }
 
-        if currentIndex < entries.count {
-            let current = entries[currentIndex]
-            if adjustedTime >= current.startTime && adjustedTime <= current.endTime {
-                return current
+        // 1) Probe currentIndex and its neighbours
+        for offset in [0, 1, -1] {
+            let i = currentIndex + offset
+            guard i >= 0, i < entries.count else { continue }
+            let e = entries[i]
+            if adjustedTime >= e.startTime && adjustedTime <= e.endTime {
+                currentIndex = i
+                return e
             }
         }
 
-        for (index, entry) in entries.enumerated() {
-            if adjustedTime >= entry.startTime && adjustedTime <= entry.endTime {
-                currentIndex = index
-                return entry
+        // 2) Binary search by startTime — find the rightmost entry whose
+        // startTime <= adjustedTime, then verify it also covers endTime.
+        var lo = 0
+        var hi = entries.count - 1
+        var candidate = -1
+        while lo <= hi {
+            let mid = (lo + hi) / 2
+            if entries[mid].startTime <= adjustedTime {
+                candidate = mid
+                lo = mid + 1
+            } else {
+                hi = mid - 1
             }
         }
-
+        guard candidate >= 0 else { return nil }
+        let e = entries[candidate]
+        if adjustedTime <= e.endTime {
+            currentIndex = candidate
+            return e
+        }
         return nil
     }
 

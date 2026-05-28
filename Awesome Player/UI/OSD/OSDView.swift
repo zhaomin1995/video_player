@@ -29,8 +29,12 @@ class OSDView: NSView {
         effectView.blendingMode = .withinWindow
         effectView.state = .active
         effectView.wantsLayer = true
-        effectView.layer?.cornerRadius = 8
+        effectView.layer?.cornerRadius = 12
         effectView.layer?.masksToBounds = true
+        // Subtle hairline border lifts the OSD off bright video frames where
+        // the vibrancy alone disappears against high-key content.
+        effectView.layer?.borderColor = NSColor.white.withAlphaComponent(0.08).cgColor
+        effectView.layer?.borderWidth = 0.5
         effectView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(effectView)
 
@@ -105,42 +109,52 @@ class OSDView: NSView {
         label.stringValue = message
         label.isHidden = false
         barContainer.isHidden = true
-
-        hideTimer?.invalidate()
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.15
-            self.animator().alphaValue = 1.0
-        }
-
-        hideTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.3
-                self?.animator().alphaValue = 0.0
-            }
-        }
+        animateIn()
+        scheduleHide(after: duration)
     }
 
-    /// Show an animated bar overlay (for volume, brightness, seek progress)
+    /// Show an animated bar overlay (for volume, brightness, seek progress).
+    /// The fill animates between successive updates for a smooth "drawing"
+    /// feel instead of a step change.
     func showBar(icon: String, fraction: Double, duration: TimeInterval = 1.0) {
         label.isHidden = true
         barContainer.isHidden = false
         barIcon.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
 
         let trackWidth = barWidth - 26
-        barFillWidthConstraint?.constant = max(0, min(trackWidth, trackWidth * fraction))
+        let newWidth = max(0, min(trackWidth, trackWidth * fraction))
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.18
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            barFillWidthConstraint?.animator().constant = newWidth
+        }
         barContainer.needsLayout = true
 
+        animateIn()
+        scheduleHide(after: duration)
+    }
+
+    private func animateIn() {
         hideTimer?.invalidate()
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.1
-            self.animator().alphaValue = 1.0
+        // Slight scale-in pop matches Apple HUD style. The transform target
+        // is the layer (not autoresizing constants), so we set it directly
+        // without going through the autolayout system.
+        if alphaValue < 0.5 {
+            layer?.transform = CATransform3DMakeScale(0.92, 0.92, 1)
         }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.18
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1.0)
+            self.animator().alphaValue = 1.0
+            self.layer?.transform = CATransform3DIdentity
+        }
+    }
 
+    private func scheduleHide(after duration: TimeInterval) {
         hideTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.3
+                context.duration = 0.28
+                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
                 self?.animator().alphaValue = 0.0
             }
         }

@@ -45,6 +45,7 @@ enum Defaults {
     static let videoDecodeMode = "video.decodeMode"       // 0=Auto, 1=HW force, 2=SW force
     static let userDefaultWidth = "video.userDefaultWidth"  // 0 = use video native
     static let smartZoomPercent = "video.smartZoomPercent"  // 100 = no upscale; 150-400 = upscale floor
+    static let convertHardwareEncoding = "convert.useHardwareEncoder" // VideoToolbox encoder via venc=avcodec{codec=h264_videotoolbox}
 
     // MARK: - Audio
     static let defaultVolume = "audio.defaultVolume"
@@ -186,6 +187,7 @@ enum Defaults {
             airplayButtonVisibility: 0,  // 0=Always, 1=When available, 2=Never
             chromecastQuality: 1,        // 0=Low, 1=Medium, 2=High
             dlnaQuality: 1,              // 0=Low, 1=Medium, 2=High
+            convertHardwareEncoding: true,
         ])
     }
 }

@@ -8,6 +8,24 @@
  *
  * The audio FIFO is necessary because decoders output variable-size frames but
  * the AAC encoder requires exactly 1024 samples per frame.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * Public surface (declared in FFmpegBridge.h):
+ *   +initialize                                  — av_log_set_level(QUIET).
+ *   +probeFile:                                  — codec ids, dimensions,
+ *                                                  duration, DV/HDR flags.
+ *   +videoCodecNameForFile:                      — human-readable codec name.
+ *   +audioTracksForFile:                         — [{index, codec, lang}…].
+ *   +subtitleTracksForFile:                      — [{index, codec, lang}…].
+ *   +remuxFile:toOutput:error:                   — MKV/AVI → MP4 remux.
+ *                                                  Copies video, copies or
+ *                                                  transcodes audio to AAC.
+ *   +extractSubtitleTrack:fromFile:error:        — write track as SRT.
+ *   +chaptersForFile:                            — [{startTime, title}…].
+ *
+ * Internal helpers live below in this file; nothing else should be called
+ * from Swift directly — go through the header.
+ * ───────────────────────────────────────────────────────────────────────────
  */
 #import "FFmpegBridge.h"
 

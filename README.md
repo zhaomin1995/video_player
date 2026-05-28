@@ -57,6 +57,7 @@ A full-featured macOS video player that combines **Dolby Vision** playback with 
 - Subtitle visibility toggle (Ctrl+V)
 - Configurable subtitle position (Bottom of Video, Bottom of Screen, Letterbox)
 - Auto-load matching subtitle files from same directory; falls back to embedded text-subtitle extraction for AVPlayer-based paths
+- **OpenSubtitles search and download** (Subtitle → Search OpenSubtitles…) — REST integration, results table, double-click to download and load. Credentials (API key + password) stored in macOS Keychain, not UserDefaults
 - Configurable font, font size, color, and outline via Preferences
 
 ### Casting
@@ -105,7 +106,7 @@ A full-featured macOS video player that combines **Dolby Vision** playback with 
 - Video window sizing (Half, Actual, Double, Fit to Screen, Fill Screen)
 - Keep on Top / Always on Top (pin button in title bar + Window menu)
 - Picture-in-Picture (PiP) support
-- Welcome view shown when no file is loaded
+- Welcome view shown when no file is loaded — drag/drop hint, Open File / Open URL buttons, and a recent-files strip
 - Theme support (System, Dark, Light) applied via NSAppearance
 
 ### System Integration
@@ -116,6 +117,8 @@ A full-featured macOS video player that combines **Dolby Vision** playback with 
 - Quit-on-last-window-closed preference
 - Window position restoration preference
 - Services menu integration
+- **Auto-update check** (Awesome Player → Check for Updates…) — polls GitHub Releases API, alerts when a newer tag is published, offers Open Release Page / Skip This Version / Remind Me Later. Auto-checks daily on launch; can be disabled
+- **Reveal Crash Logs in Finder** (Help menu) — opens `~/Library/Logs/DiagnosticReports/` filtered to our bundle, plus a one-click jump to the GitHub issue tracker for attaching them
 
 ## Requirements
 
@@ -175,12 +178,14 @@ YouTube/Web URL --> yt-dlp (bundled) --> Resolution Picker
                 +-- Video-only + Audio? --> libvlc (input-slave merge)
 
 Both engines share:
-  +-- SubtitleManager (external SRT/ASS/VTT overlay)
+  +-- SubtitleManager (external SRT/ASS/VTT overlay; binary-search lookup)
   +-- ABLoopController (A-B repeat)
   +-- NowPlayingController (MPRemoteCommandCenter)
   +-- ResumeManager (position persistence)
   +-- PlaylistManager (multi-file management)
-  +-- OSDView (on-screen display)
+  +-- ChapterNavigation (pure, testable prev/next helpers)
+  +-- ScreenshotSaver (PNG/JPEG/TIFF capture, sandbox-aware)
+  +-- OSDView (on-screen display, animated)
 ```
 
 ## Tech Stack

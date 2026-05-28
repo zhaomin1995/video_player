@@ -40,6 +40,10 @@ class PreferencesWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
+        // Min size: tab toolbar + a useful row width. Without this the user
+        // can shrink the window until every label is clipped to "Au…" — a
+        // problem especially for German strings ("Bildwiederholrate (Hz):").
+        window.minSize = NSSize(width: 700, height: 500)
         window.titleVisibility = .visible
         window.center()
         super.init(window: window)
@@ -299,15 +303,14 @@ class MediaOpenPrefsView: NSView {
         addSectionHeader(stack, "Playback Engine")
         addPopupRow(stack, "Default engine:", key: Defaults.defaultEngine, items: ["Auto", "AVPlayer", "FFmpeg"])
 
-        addSectionHeader(stack, "File Opening")
-        addToggleRow(stack, "Auto-find series files in same folder", key: Defaults.autoFindSeriesFiles)
-        addToggleRow(stack, "Auto-load next file in folder", key: Defaults.autoLoadNextFile)
-        addToggleRow(stack, "Open in new window", key: Defaults.openInNewWindow)
-
         addSectionHeader(stack, "Subtitles")
         addToggleRow(stack, "Auto-load matching subtitle files", key: Defaults.autoLoadSubtitles)
-        addPopupRow(stack, "Subtitle search:", key: Defaults.subtitleSearchScope, items: ["Same directory only", "Include subdirectories"])
         embed(stack)
+        // Removed orphaned UI rows (autoFindSeriesFiles, autoLoadNextFile,
+        // openInNewWindow, subtitleSearchScope) — their values are written
+        // to UserDefaults by these controls but read nowhere in the player,
+        // so toggling did nothing. Restore alongside the readers if these
+        // features are ever implemented.
     }
     required init?(coder: NSCoder) { fatalError() }
 }
@@ -336,7 +339,7 @@ class PlaybackPrefsView: NSView {
         addToggleRow(stack, "Shuffle", key: Defaults.shuffle)
         addPopupRow(stack, "When playlist ends:", key: Defaults.playlistEndAction, items: ["Do Nothing", "Close Window", "Quit"])
         addToggleRow(stack, "Auto-add files from directory", key: Defaults.autoAddFromDirectory)
-        addPopupRow(stack, "Sort order:", key: Defaults.sortOrder, items: ["Name (ascending)", "Name (descending)", "Date modified", "File size"])
+        // sortOrder pref was orphaned — no playlist code consumed it.
         embed(stack)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -369,8 +372,9 @@ class VideoPrefsView: NSView {
 
         addSectionHeader(stack, L("Video Equalizer Defaults"))
         addSliderRow(stack, L("Brightness:"), min: -0.5, max: 0.5, value: 0, key: Defaults.defaultBrightness)
-        addSliderRow(stack, L("Contrast:"), min: 0.5, max: 2.0, value: 1.0, key: Defaults.defaultContrast)
-        addSliderRow(stack, L("Saturation:"), min: 0, max: 2.0, value: 1.0, key: Defaults.defaultSaturation)
+        // Contrast / saturation rows were orphaned — the live Video EQ panel
+        // sets these from menu/slider directly; the prefs sliders weren't
+        // wired to anything. Removed to stop misleading users.
 
         addSectionHeader(stack, L("Screenshot"))
         addPopupRow(stack, L("Format:"), key: Defaults.screenshotFormat, items: ["PNG", "JPEG", "TIFF"])
@@ -396,8 +400,7 @@ class AudioPrefsView: NSView {
 
         addSectionHeader(stack, "Audio Processing")
         addToggleRow(stack, "Enable compressor (night mode)", key: Defaults.compressorEnabled)
-        addToggleRow(stack, "Enable spatializer (headphone surround)", key: Defaults.spatializerEnabled)
-        addSliderRow(stack, "Stereo width:", min: 0, max: 200, value: 100, key: Defaults.stereoWidth)
+        // spatializer + stereoWidth UI removed — no audio code path reads them.
 
         addSectionHeader(stack, "Normalization")
         addToggleRow(stack, "Enable loudness normalization", key: Defaults.normalizationEnabled)
@@ -433,6 +436,25 @@ class SubtitlePrefsView: NSView {
 
         addSectionHeader(stack, "Sync")
         addSliderRow(stack, "Delay step (s):", min: 0.05, max: 1.0, value: 0.1, key: Defaults.subtitleDelayStep)
+
+        addSectionHeader(stack, "OpenSubtitles")
+        // API key + password live in Keychain (see OpenSubtitlesService) so
+        // we don't bind these to UserDefaults — the helper reads/writes
+        // through OpenSubtitlesService instead.
+        addKeychainFieldRow(stack, "API key:",
+                            initial: OpenSubtitlesService.storedAPIKey() ?? "",
+                            placeholder: "Get one at opensubtitles.com",
+                            secure: true,
+                            setter: { OpenSubtitlesService.setAPIKey($0) })
+        addTextFieldRow(stack, "Username:", key: "opensubs.username", placeholder: "")
+        addKeychainFieldRow(stack, "Password:",
+                            initial: OpenSubtitlesService.storedPassword() ?? "",
+                            placeholder: "",
+                            secure: true,
+                            setter: { password in
+                                let user = OpenSubtitlesService.storedUsername() ?? ""
+                                OpenSubtitlesService.setCredentials(username: user, password: password)
+                            })
         embed(stack)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -445,10 +467,10 @@ class FullScreenPrefsView: NSView {
         addSectionHeader(stack, "Enter / Exit")
         addToggleRow(stack, "Auto-enter fullscreen on open", key: Defaults.autoEnterFullscreen)
         addToggleRow(stack, "Pause when exiting fullscreen", key: Defaults.pauseOnExitFullscreen)
-        addToggleRow(stack, "Start playing when entering fullscreen", key: Defaults.playOnEnterFullscreen)
+        // playOnEnterFullscreen + blackOutOtherScreens rows removed —
+        // no fullscreen code reads them today.
 
         addSectionHeader(stack, "Display")
-        addToggleRow(stack, "Black out other screens", key: Defaults.blackOutOtherScreens)
         addPopupRow(stack, "Control bar:", key: Defaults.fullscreenControlBar, items: ["Auto-hide (3 seconds)", "Auto-hide (5 seconds)", "Always Show"])
 
         addSectionHeader(stack, "Time Display")
@@ -569,9 +591,10 @@ class InputPrefsView: NSView, NSTableViewDataSource, NSTableViewDelegate {
         stack.addArrangedSubview(scrollView)
 
         addSectionHeader(stack, L("Mouse"))
-        addPopupRow(stack, L("Single click:"), key: Defaults.singleClickAction, items: [L("Play / Pause"), L("Nothing")])
+        // Only doubleClickAction + rightClickAction are wired into mouseDown.
+        // single/middleClickAction popups were orphaned; removed to stop
+        // showing options that didn't do anything.
         addPopupRow(stack, L("Double click:"), key: Defaults.doubleClickAction, items: [L("Toggle fullscreen"), L("Nothing")])
-        addPopupRow(stack, L("Middle click:"), key: Defaults.middleClickAction, items: [L("Mute / Unmute"), L("Play / Pause"), L("Nothing")])
         addPopupRow(stack, L("Right click:"), key: Defaults.rightClickAction, items: [L("Context Menu"), L("Nothing")])
 
         addSectionHeader(stack, L("Scroll Wheel"))
@@ -609,18 +632,11 @@ class CastPrefsView: NSView {
         super.init(frame: frame)
         let stack = makePrefsStack()
         addSectionHeader(stack, "Connection")
-        addPopupRow(stack, "Default behavior:", key: Defaults.castDefaultBehavior, items: ["Ask every time", "Auto-connect to last device"])
         addToggleRow(stack, "Auto-disconnect on window close", key: Defaults.autoDisconnectOnClose)
         addToggleRow(stack, "Resume local playback on disconnect", key: Defaults.resumeLocalOnDisconnect)
-
-        addSectionHeader(stack, "AirPlay")
-        addPopupRow(stack, "Show AirPlay button:", key: Defaults.airplayButtonVisibility, items: ["Always", "When device available", "Never"])
-
-        addSectionHeader(stack, "Chromecast")
-        addPopupRow(stack, "Transcoding quality:", key: Defaults.chromecastQuality, items: ["Low (720p)", "Medium (1080p)", "High (4K)"])
-
-        addSectionHeader(stack, "DLNA")
-        addPopupRow(stack, "Transcoding quality:", key: Defaults.dlnaQuality, items: ["Low (720p)", "Medium (1080p)", "High (4K)"])
+        // The other four cast prefs (castDefaultBehavior, airplayButtonVisibility,
+        // chromecastQuality, dlnaQuality) had UI but no reader — removed.
+        // The actual cast flow always asks per-session and uses fixed quality.
         embed(stack)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -729,6 +745,47 @@ extension NSView {
         popup.bind(.selectedIndex, to: NSUserDefaultsController.shared, withKeyPath: "values.\(key)", options: nil)
         addRow(stack, label, popup)
     }
+
+    /// Free-text input bound to a UserDefaults string key. Used for things
+    /// like API keys / credentials that don't fit a popup or slider.
+    func addTextFieldRow(_ stack: NSStackView, _ label: String, key: String, placeholder: String = "", secure: Bool = false) {
+        let field: NSTextField = secure ? NSSecureTextField() : NSTextField()
+        field.placeholderString = placeholder
+        field.widthAnchor.constraint(equalToConstant: 240).isActive = true
+        field.bind(.value, to: NSUserDefaultsController.shared, withKeyPath: "values.\(key)",
+                   options: [.continuouslyUpdatesValue: true])
+        addRow(stack, label, field)
+    }
+
+    /// Free-text input for values that live in Keychain (or anywhere else
+    /// outside UserDefaults). The setter closure receives the new string on
+    /// every commit (Return / focus loss).
+    func addKeychainFieldRow(_ stack: NSStackView, _ label: String, initial: String,
+                              placeholder: String = "", secure: Bool = false,
+                              setter: @escaping (String) -> Void) {
+        let field: NSTextField = secure ? NSSecureTextField() : NSTextField()
+        field.placeholderString = placeholder
+        field.stringValue = initial
+        field.widthAnchor.constraint(equalToConstant: 240).isActive = true
+        let holder = TextFieldCommitHandler(setter: setter)
+        field.target = holder
+        field.action = #selector(TextFieldCommitHandler.commit(_:))
+        // Retain the closure holder for the life of the field. Without this
+        // it would deallocate immediately and clicking commit would crash.
+        objc_setAssociatedObject(field, &Self.textFieldHolderKey, holder, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        addRow(stack, label, field)
+    }
+
+    private static var textFieldHolderKey: UInt8 = 0
+}
+
+/// Bridges target/action calls into a Swift closure. Used by
+/// addKeychainFieldRow so the prefs UI doesn't need a dedicated controller
+/// class per field.
+private class TextFieldCommitHandler: NSObject {
+    let setter: (String) -> Void
+    init(setter: @escaping (String) -> Void) { self.setter = setter }
+    @objc func commit(_ sender: NSTextField) { setter(sender.stringValue) }
 }
 
 class FlippedView: NSView {

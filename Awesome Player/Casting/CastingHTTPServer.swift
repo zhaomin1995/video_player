@@ -25,7 +25,7 @@ class CastingHTTPServer {
                         }
                     }
                 case .failed(let error):
-                    print("HTTP server failed: \(error)")
+                    wlog(.http, "HTTP server failed: \(error)")
                     DispatchQueue.main.async { completion(nil) }
                 default:
                     break
@@ -38,7 +38,7 @@ class CastingHTTPServer {
 
             listener?.start(queue: .global(qos: .userInitiated))
         } catch {
-            print("Failed to start HTTP server: \(error)")
+            wlog(.http, "Failed to start HTTP server: \(error)")
             completion(nil)
         }
     }
@@ -117,7 +117,7 @@ class CastingHTTPServer {
         headers += "Connection: close\r\n"
         headers += "\r\n"
 
-        let headerData = headers.data(using: .utf8)!
+        let headerData = headers.data(using: .utf8) ?? Data()
         connection.send(content: headerData, completion: .contentProcessed { _ in })
 
         // Send file data

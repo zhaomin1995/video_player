@@ -6,7 +6,11 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
-	<key>com.apple.security.device.audio-input</key>
+	<!-- Hardened Runtime is on (ENABLE_HARDENED_RUNTIME=YES). Bundled libvlc
+	     dylibs and plugins are signed adhoc rather than with the app's Team
+	     ID, so library validation would refuse to load them. Future state:
+	     drop this and sign every dylib with the same Developer ID. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>
 </dict>
 </plist>

@@ -28,12 +28,21 @@ class SeekSliderView: NSView {
     private var thumbnailWindow: NSPanel?
     private var thumbnailView: NSImageView?
     private var imageGenerator: AVAssetImageGenerator?
-    private var thumbnailCache: [Int: NSImage] = [:]
+    /// LRU thumbnail cache with byte-cost ceiling instead of a hard count
+    /// ceiling. Earlier code wiped the whole dict at 150 entries — long
+    /// films re-generated thumbs constantly on repeat scrubs. NSCache
+    /// evicts the least-recently-used entries automatically when the
+    /// cost limit is hit and survives memory pressure events.
+    private lazy var thumbnailCache: NSCache<NSNumber, NSImage> = {
+        let c = NSCache<NSNumber, NSImage>()
+        c.totalCostLimit = 24 * 1024 * 1024  // ~24 MB of thumbnails
+        return c
+    }()
     private var pendingThumbnailTime: Double?
 
     var currentAsset: AVAsset? {
         didSet {
-            thumbnailCache.removeAll()
+            thumbnailCache.removeAllObjects()
             if let asset = currentAsset {
                 let gen = AVAssetImageGenerator(asset: asset)
                 gen.appliesPreferredTrackTransform = true
@@ -271,9 +280,9 @@ class SeekSliderView: NSView {
     private func requestThumbnail(at time: Double, screenPoint: NSPoint) {
         guard imageGenerator != nil else { return }
 
-        let cacheKey = Int(time / 2)
+        let cacheKey = NSNumber(value: Int(time / 2))
 
-        if let cached = thumbnailCache[cacheKey] {
+        if let cached = thumbnailCache.object(forKey: cacheKey) {
             showThumbnail(cached, screenPoint: screenPoint)
             return
         }
@@ -288,10 +297,11 @@ class SeekSliderView: NSView {
             guard let self = self, let cgImage = cgImage else { return }
             let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
             DispatchQueue.main.async {
-                if self.thumbnailCache.count > 150 {
-                    self.thumbnailCache.removeAll()
-                }
-                self.thumbnailCache[cacheKey] = image
+                // Cost = approx bytes (RGBA8 width*height*4). Lets NSCache
+                // size the working set against totalCostLimit instead of a
+                // raw count, which mattered for 4K vs 720p thumbnails.
+                let cost = Int(cgImage.width * cgImage.height * 4)
+                self.thumbnailCache.setObject(image, forKey: cacheKey, cost: cost)
                 if let pending = self.pendingThumbnailTime, abs(pending - time) < 3 {
                     self.showThumbnail(image, screenPoint: screenPoint)
                 }

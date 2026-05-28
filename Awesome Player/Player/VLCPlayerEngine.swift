@@ -67,7 +67,7 @@ class VLCPlayerEngine {
         let inst = ptrs.withUnsafeMutableBufferPointer { buf in
             libvlc_new(Int32(args.count), buf.baseAddress!)
         }
-        if inst != nil { print("[VLCEngine] Shared libvlc instance created") }
+        if inst != nil { dlog(.vlc, "Shared libvlc instance created") }
         return inst
     }()
 
@@ -143,7 +143,7 @@ class VLCPlayerEngine {
     init() {
         instance = Self.sharedVLCInstance
         if instance == nil {
-            print("[VLCEngine] Failed to get libvlc instance")
+            wlog(.vlc, "Failed to get libvlc instance")
         }
     }
 
@@ -160,7 +160,7 @@ class VLCPlayerEngine {
             media = libvlc_media_new_location(inst, url.absoluteString)
         }
         guard media != nil else {
-            print("[VLCEngine] Failed to create media for: \(url.absoluteString)")
+            wlog(.vlc, "Failed to create media for: \(url.absoluteString)")
             return false
         }
 
@@ -213,7 +213,7 @@ class VLCPlayerEngine {
         duration = 0
         attachEvents()
 
-        print("[VLCEngine] Opened: \(url.lastPathComponent)")
+        dlog(.vlc, "Opened: \(url.lastPathComponent)")
         return true
     }
 
@@ -618,7 +618,7 @@ class VLCPlayerEngine {
         let type = String(cString: libvlc_renderer_item_type(held))
         let info = RendererInfo(name: name, type: type, item: held)
         discoveredRenderers.append(info)
-        print("[VLCEngine] Renderer discovered: \(name) (\(type))")
+        dlog(.vlc, "Renderer discovered: \(name) (\(type))")
         onRendererDiscovered?()
     }
 

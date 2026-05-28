@@ -30,6 +30,7 @@ class VolumeSliderView: NSView {
         muteButton.target = self
         muteButton.action = #selector(muteClicked)
         muteButton.widthAnchor.constraint(equalToConstant: 20).isActive = true
+        muteButton.setAccessibilityLabel(L("Mute / Unmute"))
 
         slider.minValue = 0
         slider.maxValue = 1
@@ -37,6 +38,7 @@ class VolumeSliderView: NSView {
         slider.target = self
         slider.action = #selector(sliderChanged)
         slider.isContinuous = true
+        slider.setAccessibilityLabel(L("Volume"))
 
         stack.addArrangedSubview(muteButton)
         stack.addArrangedSubview(slider)

@@ -4,17 +4,25 @@
 /// establishing a virtual connection before launching the media receiver app.
 import Foundation
 
+/// Debug-only cast log. In Release the function still exists (so call sites
+/// stay clean) but every call is inlined away to a no-op. We deliberately do
+/// NOT write to /tmp in shipped builds — earlier versions did, leaking
+/// receiver names and stream URLs to a world-readable file.
+@inline(__always)
 func castLog(_ message: String) {
+    #if DEBUG
     let line = "[\(Date())] \(message)\n"
     let path = "/tmp/chromecast_debug.log"
+    let data = line.data(using: .utf8) ?? Data()
     if let handle = FileHandle(forWritingAtPath: path) {
         handle.seekToEndOfFile()
-        handle.write(line.data(using: .utf8)!)
+        handle.write(data)
         handle.closeFile()
     } else {
-        FileManager.default.createFile(atPath: path, contents: line.data(using: .utf8))
+        FileManager.default.createFile(atPath: path, contents: data)
     }
     print(message)
+    #endif
 }
 
 protocol ChromecastManagerDelegate: AnyObject {

@@ -47,6 +47,7 @@ class TitleBarView: NSView {
         pinButton.action = #selector(pinClicked)
         pinButton.translatesAutoresizingMaskIntoConstraints = false
         pinButton.setButtonType(.toggle)
+        pinButton.setAccessibilityLabel(L("Keep window on top"))
         addSubview(pinButton)
 
         dvBadge.isHidden = true

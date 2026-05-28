@@ -29,6 +29,14 @@ class PlayerViewController: NSViewController {
     private let playlistManager = PlaylistManager()
     private let abLoopController = ABLoopController()
     private(set) var currentFileURL: URL?
+    /// The URL the engine is actually decoding. Equals currentFileURL for the
+    /// straight AVPlayer / VLC paths, but for Dolby Vision content it points
+    /// at the remuxed-to-MP4 temp file. Cast/AirPlay paths must use THIS so
+    /// receivers get the format AVKit/Chromecast can actually consume.
+    var playbackSourceURL: URL?
+    /// Tracks the current DV remux output so we can delete it on the next
+    /// openFile or on app terminate. Without this, temp .mp4 files leak.
+    private var dvRemuxOutputURL: URL?
     private var videoRotation: CGFloat = 0
     private var videoFlippedH = false
     private var videoFlippedV = false
@@ -80,20 +88,38 @@ class PlayerViewController: NSViewController {
     }
 
     // MARK: - Preference Readers
+    //
+    // These are read on every hot-path event (key down, scroll, seek). Cached
+    // as stored properties + refreshed on UserDefaults.didChangeNotification
+    // rather than re-reading from UserDefaults each time. Keeps event handlers
+    // cheap and avoids reading stale-during-mutation values inside a single
+    // event sequence.
 
-    private var shortSeek: Double {
-        let v = UserDefaults.standard.double(forKey: Defaults.shortSeekInterval)
-        return v >= 1 ? v : 5
+    private var shortSeek: Double = 5
+    private var longSeek: Double = 30
+    private var useKeyframeSeeking: Bool = false
+    private var scrollAction: Int = 0
+    private var defaultsObserver: NSObjectProtocol?
+
+    private func refreshCachedPreferences() {
+        let ud = UserDefaults.standard
+        let s = ud.double(forKey: Defaults.shortSeekInterval)
+        shortSeek = s >= 1 ? s : 5
+        let l = ud.double(forKey: Defaults.longSeekInterval)
+        longSeek = l >= 1 ? l : 30
+        useKeyframeSeeking = ud.bool(forKey: Defaults.keyFrameSeeking)
+        scrollAction = ud.integer(forKey: Defaults.scrollWheelAction)
     }
-    private var longSeek: Double {
-        let v = UserDefaults.standard.double(forKey: Defaults.longSeekInterval)
-        return v >= 1 ? v : 30
-    }
-    private var useKeyframeSeeking: Bool {
-        UserDefaults.standard.bool(forKey: Defaults.keyFrameSeeking)
-    }
-    private var scrollAction: Int {
-        UserDefaults.standard.integer(forKey: Defaults.scrollWheelAction)
+
+    private func observePreferenceChanges() {
+        refreshCachedPreferences()
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshCachedPreferences()
+        }
     }
 
     override func loadView() {
@@ -126,6 +152,25 @@ class PlayerViewController: NSViewController {
         setupGestureRecognizers()
         abLoopController.delegate = self
         passthroughManager.delegate = self
+        Self.purgeOrphanedDVRemuxFiles()
+        observePreferenceChanges()
+    }
+
+    deinit {
+        if let observer = defaultsObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    /// Wipe any leftover DV remux outputs from a previous run. The naming
+    /// convention (UUID + "_full.mp4") makes them easy to recognize without
+    /// risking unrelated temp files.
+    private static func purgeOrphanedDVRemuxFiles() {
+        let tmp = FileManager.default.temporaryDirectory
+        guard let entries = try? FileManager.default.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil) else { return }
+        for url in entries where url.lastPathComponent.hasSuffix("_full.mp4") {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     override func viewDidAppear() {
@@ -158,6 +203,15 @@ class PlayerViewController: NSViewController {
     private func setupWelcomeView() {
         welcomeView.onFileDropped = { [weak self] url in
             self?.onFileDropped?(url)
+        }
+        welcomeView.onRecentClicked = { [weak self] url in
+            self?.openFile(url: url)
+        }
+        welcomeView.onOpenFileClicked = {
+            (NSApp.delegate as? AppDelegate)?.openFileAction(nil)
+        }
+        welcomeView.onOpenURLClicked = {
+            (NSApp.delegate as? AppDelegate)?.openURL(nil)
         }
         welcomeView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(welcomeView)
@@ -295,6 +349,7 @@ class PlayerViewController: NSViewController {
             case 2:
                 playerEngine?.stop(); vlcEngine?.stop()
                 welcomeView.isHidden = false; controlBarView.setVideoActive(false)
+                welcomeView.refreshRecents()
             default: break
             }
             return
@@ -333,30 +388,30 @@ class PlayerViewController: NSViewController {
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
 
-        menu.addItem(withTitle: (playerEngine?.isPlaying ?? vlcEngine?.isPlaying ?? false) ? "Pause" : "Play",
+        menu.addItem(withTitle: (playerEngine?.isPlaying ?? vlcEngine?.isPlaying ?? false) ? L("Pause") : L("Play"),
             action: #selector(AppDelegate.togglePlayPause(_:)), keyEquivalent: "")
         menu.addItem(.separator())
 
-        menu.addItem(withTitle: "Seek Forward 5s", action: #selector(AppDelegate.seekForward5(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Seek Backward 5s", action: #selector(AppDelegate.seekBackward5(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Seek Forward 5s"), action: #selector(AppDelegate.seekForward5(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Seek Backward 5s"), action: #selector(AppDelegate.seekBackward5(_:)), keyEquivalent: "")
         menu.addItem(.separator())
 
-        let audioTrack = NSMenuItem(title: "Audio Track", action: nil, keyEquivalent: "")
-        let audioSubmenu = NSMenu(title: "Audio Track")
+        let audioTrack = NSMenuItem(title: L("Audio Track"), action: nil, keyEquivalent: "")
+        let audioSubmenu = NSMenu(title: L("Audio Track"))
         audioSubmenu.delegate = TrackMenuDelegate.audio
         audioTrack.submenu = audioSubmenu
         menu.addItem(audioTrack)
 
-        let subTrack = NSMenuItem(title: "Subtitle Track", action: nil, keyEquivalent: "")
-        let subSubmenu = NSMenu(title: "Subtitle Track")
+        let subTrack = NSMenuItem(title: L("Subtitle Track"), action: nil, keyEquivalent: "")
+        let subSubmenu = NSMenu(title: L("Subtitle Track"))
         subSubmenu.delegate = TrackMenuDelegate.subtitle
         subTrack.submenu = subSubmenu
         menu.addItem(subTrack)
 
         menu.addItem(.separator())
 
-        let speedItem = NSMenuItem(title: "Speed", action: nil, keyEquivalent: "")
-        let speedSubmenu = NSMenu(title: "Speed")
+        let speedItem = NSMenuItem(title: L("Speed"), action: nil, keyEquivalent: "")
+        let speedSubmenu = NSMenu(title: L("Speed"))
         for speed in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0] {
             speedSubmenu.addItem(withTitle: String(format: "%.2gx", speed),
                                 action: #selector(AppDelegate.setSpeed(_:)), keyEquivalent: "")
@@ -365,7 +420,7 @@ class PlayerViewController: NSViewController {
         menu.addItem(speedItem)
 
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Screenshot", action: #selector(AppDelegate.saveScreenshot(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Screenshot"), action: #selector(AppDelegate.saveScreenshot(_:)), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: L("Enter Full Screen"), action: #selector(AppDelegate.toggleFullScreenAction(_:)), keyEquivalent: "")
         menu.addItem(withTitle: L("Picture in Picture"), action: #selector(AppDelegate.togglePiP(_:)), keyEquivalent: "")
@@ -385,7 +440,18 @@ class PlayerViewController: NSViewController {
 
     func openFile(url: URL) {
         saveCurrentPosition()
+        // Drop any in-flight engine observation BEFORE clobbering state so
+        // its closure can't fire against the new engine that's about to
+        // replace it (race window between assignment and the next .new tick).
+        playbackStatusObservation = nil
+        // Delete the prior DV remux temp file (if any) — each session can
+        // open many DV files; without this they accumulate in /var/folders.
+        if let prior = dvRemuxOutputURL {
+            try? FileManager.default.removeItem(at: prior)
+            dvRemuxOutputURL = nil
+        }
         currentFileURL = url
+        playbackSourceURL = url
         hasResizedForCurrentFile = false
 
         // Reset per-file state
@@ -676,15 +742,20 @@ class PlayerViewController: NSViewController {
     /// because the VC needs to resize the window to match the video's native aspect ratio
     /// — that info is only available after the asset header is parsed.
     private func playWithEngine(_ engine: AVPlayerEngine, url: URL, fallbackRemux: Bool = false) {
-        print("[AwesomePlayer] Opening: \(url.path)")
+        dlog(.player, "Opening: \(url.path)")
         engine.open(url: url)
         videoView.setPlayer(engine.player)
         controlBarView.setPlayer(engine.player)
 
-        playbackStatusObservation = engine.player?.currentItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
+        // Drop any prior observation so it can't fire on a stale closure
+        // capturing the previous engine. Capture engine weakly inside the
+        // new observation for the same reason.
+        playbackStatusObservation = nil
+        playbackStatusObservation = engine.player?.currentItem?.observe(\.status, options: [.new]) { [weak self, weak engine] item, _ in
+            guard let engine = engine else { return }
             guard item.status == .readyToPlay else {
                 if item.status == .failed {
-                    print("[AwesomePlayer] Player item FAILED: \(item.error?.localizedDescription ?? "?")")
+                    wlog(.player, "Player item FAILED: \(item.error?.localizedDescription ?? "?")")
                     if fallbackRemux {
                         self?.remuxAndPlay(engine: engine, url: url)
                         return
@@ -694,7 +765,7 @@ class PlayerViewController: NSViewController {
             }
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                print("[AwesomePlayer] Ready to play! Duration: \(engine.duration)s")
+                dlog(.player, "Ready to play! Duration: \(engine.duration)s")
                 self.controlBarView.setDuration(engine.duration)
                 let autoPlay = UserDefaults.standard.bool(forKey: Defaults.autoPlayOnOpen)
                 if autoPlay {
@@ -726,13 +797,27 @@ class PlayerViewController: NSViewController {
             let ok = (try? FFmpegBridge.remuxFile(url.path, toOutput: fullURL.path)) != nil
             DispatchQueue.main.async {
                 guard let self = self else { return }
+                // Bail if the user opened a different file while remux was
+                // running — otherwise the stale engine here would overwrite
+                // the freshly-set one on `self.playerEngine`.
+                guard self.currentFileURL == url else {
+                    try? FileManager.default.removeItem(at: fullURL)
+                    return
+                }
                 if ok {
+                    // Tear the current observation down BEFORE swapping engines
+                    // so its closure can't fire against the new engine.
+                    self.playbackStatusObservation = nil
+                    self.playerEngine?.stop()
                     let newEngine = AVPlayerEngine()
                     newEngine.allowsExternalPlayback = allowsExternal
                     self.playerEngine = newEngine
                     newEngine.delegate = self
+                    self.playbackSourceURL = fullURL
+                    self.dvRemuxOutputURL = fullURL
                     self.playWithEngine(newEngine, url: fullURL)
                 } else {
+                    try? FileManager.default.removeItem(at: fullURL)
                     self.osdView.show(message: L("Failed to open file"))
                 }
             }
@@ -882,65 +967,15 @@ class PlayerViewController: NSViewController {
     // MARK: - Screenshot
 
     func saveScreenshot() {
-        // VLC screenshot fallback
-        if playerEngine == nil, let vlc = vlcEngine {
-            let saveIndex = UserDefaults.standard.integer(forKey: Defaults.screenshotSavePath)
-            let dir: URL = {
-                switch saveIndex {
-                case 1: return FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!
-                case 2: return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-                default: return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
-                }
-            }()
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-            let filename = "Awesome Player \(formatter.string(from: Date())).png"
-            let path = dir.appendingPathComponent(filename).path
-            if vlc.takeSnapshot(path: path) {
-                osdView.show(message: L("Screenshot saved"))
-            } else {
-                osdView.show(message: L("Screenshot failed"))
+        ScreenshotSaver.save(playerEngine: playerEngine, vlcEngine: vlcEngine) { [weak self] result in
+            switch result {
+            case .saved(let dir):
+                self?.osdView.show(message: String(format: L("Screenshot saved to %@"), dir))
+            case .failed:
+                self?.osdView.show(message: L("Screenshot failed"))
+            case .noVideo:
+                self?.osdView.show(message: L("No video playing"))
             }
-            return
-        }
-        guard let player = playerEngine?.player, let item = player.currentItem else {
-            osdView.show(message: L("No video playing"))
-            return
-        }
-        let time = player.currentTime()
-        let generator = AVAssetImageGenerator(asset: item.asset)
-        generator.requestedTimeToleranceBefore = .zero
-        generator.requestedTimeToleranceAfter = .zero
-        generator.appliesPreferredTrackTransform = true
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            var actualTime = CMTime.zero
-            guard let cgImage = try? generator.copyCGImage(at: time, actualTime: &actualTime) else {
-                DispatchQueue.main.async { self?.osdView.show(message: L("Screenshot failed")) }
-                return
-            }
-            let rep = NSBitmapImageRep(cgImage: cgImage)
-            let formatIndex = UserDefaults.standard.integer(forKey: Defaults.screenshotFormat)
-            let (fileType, ext): (NSBitmapImageRep.FileType, String) = {
-                switch formatIndex {
-                case 1: return (.jpeg, "jpg")
-                case 2: return (.tiff, "tiff")
-                default: return (.png, "png")
-                }
-            }()
-            guard let data = rep.representation(using: fileType, properties: [:]) else { return }
-            let saveIndex = UserDefaults.standard.integer(forKey: Defaults.screenshotSavePath)
-            let (dir, dirName): (URL, String) = {
-                switch saveIndex {
-                case 1: return (FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!, "Pictures")
-                case 2: return (FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!, "Downloads")
-                default: return (FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!, "Desktop")
-                }
-            }()
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-            let filename = "Awesome Player \(formatter.string(from: Date())).\(ext)"
-            try? data.write(to: dir.appendingPathComponent(filename))
-            DispatchQueue.main.async { self?.osdView.show(message: String(format: L("Screenshot saved to %@"), dirName)) }
         }
     }
 
@@ -1092,7 +1127,7 @@ class PlayerViewController: NSViewController {
 
     func seekToNextChapter() {
         let current = playerEngine?.currentTime ?? vlcEngine?.currentTime ?? 0
-        if let next = chapters.firstIndex(where: { ($0["startTime"] as? Double ?? 0) > current + 1 }) {
+        if let next = ChapterNavigation.nextChapterIndex(currentTime: current, chapters: chapters) {
             seekToChapter(at: next)
         } else {
             osdView.show(message: L("No next chapter"))
@@ -1101,11 +1136,8 @@ class PlayerViewController: NSViewController {
 
     func seekToPreviousChapter() {
         let current = playerEngine?.currentTime ?? vlcEngine?.currentTime ?? 0
-        let candidates = chapters.enumerated().filter { ($0.element["startTime"] as? Double ?? 0) < current - 2 }
-        if let prev = candidates.last {
-            seekToChapter(at: prev.offset)
-        } else if !chapters.isEmpty {
-            seekToChapter(at: 0)
+        if let prev = ChapterNavigation.previousChapterIndex(currentTime: current, chapters: chapters) {
+            seekToChapter(at: prev)
         } else {
             osdView.show(message: L("No previous chapter"))
         }
@@ -1427,9 +1459,17 @@ extension PlayerViewController: VLCPlayerEngineDelegate {
         (NSApp.delegate as? AppDelegate)?.nowPlayingController.updatePlaybackState(isPlaying: false)
         let action = UserDefaults.standard.integer(forKey: Defaults.mediaEndAction)
         switch action {
+        case 0: // Nothing — match AVPlayer twin (clear now-playing, keep frame)
+            (NSApp.delegate as? AppDelegate)?.nowPlayingController.clear()
         case 1: // Close Media
             vlcEngine?.stop()
+            // Detach VLC's render layer from videoView; otherwise the last
+            // frame stays on top of welcomeView and the user sees a frozen
+            // image instead of the idle state.
+            videoView.subviews.forEach { $0.removeFromSuperview() }
+            vlcEngine = nil
             welcomeView.isHidden = false
+            welcomeView.refreshRecents()
             controlBarView.setVideoActive(false)
             (NSApp.delegate as? AppDelegate)?.nowPlayingController.clear()
         case 2: // Play Next

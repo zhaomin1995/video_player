@@ -28,14 +28,34 @@ struct ConvertProfile {
     /// Builds the `:sout=...` option that libvlc consumes to set up the
     /// transcode + file-output chain. Format:
     ///   #transcode{vcodec=X,acodec=Y,...}:standard{access=file,mux=Z,dst=PATH}
-    func soutOption(outputPath: String) -> String {
+    func soutOption(outputPath: String, useHardwareEncoder: Bool = false) -> String {
         let transcode: String
         if let v = videoCodec {
-            transcode = "vcodec=\(v),acodec=\(audioCodec),ab=192,channels=2,samplerate=44100"
+            // VideoToolbox HW encoders are only wired for h264 / hevc fourccs.
+            // For other codecs (VP80, theo, mp2v, …) VLC has no VT bridge, so
+            // fall back to the software encoder silently.
+            let vtCodec: String? = useHardwareEncoder ? Self.videoToolboxCodec(for: v) : nil
+            var parts = ["vcodec=\(v)"]
+            if let vt = vtCodec {
+                parts.append("venc=avcodec{codec=\(vt)}")
+            }
+            parts.append("acodec=\(audioCodec)")
+            parts.append("ab=192")
+            parts.append("channels=2")
+            parts.append("samplerate=44100")
+            transcode = parts.joined(separator: ",")
         } else {
             transcode = "vcodec=none,acodec=\(audioCodec),ab=192,channels=2,samplerate=44100"
         }
         return ":sout=#transcode{\(transcode)}:standard{access=file,mux=\(container),dst=\(outputPath)}"
+    }
+
+    private static func videoToolboxCodec(for fourcc: String) -> String? {
+        switch fourcc.lowercased() {
+        case "h264": return "h264_videotoolbox"
+        case "hevc", "h265": return "hevc_videotoolbox"
+        default: return nil
+        }
     }
 }
 
@@ -60,6 +80,7 @@ class ConvertStreamWindowController: NSWindowController {
     private let dropZone = ConvertDropZoneView()
     private let mediaLabel = NSTextField(labelWithString: L("No media selected"))
     private let profilePopUp = NSPopUpButton()
+    private let hwEncodeCheckbox = NSButton(checkboxWithTitle: L("Use hardware encoder (VideoToolbox)"), target: nil, action: nil)
     private let saveButton = NSButton(title: L("Save as File"), target: nil, action: nil)
     private let streamButton = NSButton(title: L("Stream"), target: nil, action: nil)
     private let goButton = NSButton(title: L("Go!"), target: nil, action: nil)
@@ -133,6 +154,13 @@ class ConvertStreamWindowController: NSWindowController {
         profilePopUp.translatesAutoresizingMaskIntoConstraints = false
         profileBox.contentView?.addSubview(profilePopUp)
 
+        hwEncodeCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        hwEncodeCheckbox.state = UserDefaults.standard.bool(forKey: Defaults.convertHardwareEncoding) ? .on : .off
+        hwEncodeCheckbox.target = self
+        hwEncodeCheckbox.action = #selector(hwEncodeToggled(_:))
+        hwEncodeCheckbox.toolTip = L("Use Apple VideoToolbox for H.264/HEVC profiles. Falls back to software for other codecs.")
+        profileBox.contentView?.addSubview(hwEncodeCheckbox)
+
         // Section 3: Destination
         let destBox = sectionBox(title: L("Choose Destination"))
         saveButton.bezelStyle = .rounded
@@ -178,6 +206,12 @@ class ConvertStreamWindowController: NSWindowController {
             contentView.addSubview($0)
         }
 
+        // NSBox always returns a non-nil contentView, but the type is Optional —
+        // bind once so the constraint block doesn't repeat `!` on every line.
+        guard let dropContent = dropBox.contentView,
+              let profileContent = profileBox.contentView,
+              let destContent = destBox.contentView else { return }
+
         // Layout
         NSLayoutConstraint.activate([
             dropBox.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
@@ -185,34 +219,37 @@ class ConvertStreamWindowController: NSWindowController {
             dropBox.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             dropBox.heightAnchor.constraint(equalToConstant: 180),
 
-            dropZone.topAnchor.constraint(equalTo: dropBox.contentView!.topAnchor, constant: 20),
-            dropZone.centerXAnchor.constraint(equalTo: dropBox.contentView!.centerXAnchor),
+            dropZone.topAnchor.constraint(equalTo: dropContent.topAnchor, constant: 20),
+            dropZone.centerXAnchor.constraint(equalTo: dropContent.centerXAnchor),
             dropZone.widthAnchor.constraint(equalToConstant: 100),
             dropZone.heightAnchor.constraint(equalToConstant: 80),
 
             openButton.topAnchor.constraint(equalTo: dropZone.bottomAnchor, constant: 8),
-            openButton.centerXAnchor.constraint(equalTo: dropBox.contentView!.centerXAnchor),
+            openButton.centerXAnchor.constraint(equalTo: dropContent.centerXAnchor),
 
             mediaLabel.topAnchor.constraint(equalTo: openButton.bottomAnchor, constant: 8),
-            mediaLabel.leadingAnchor.constraint(equalTo: dropBox.contentView!.leadingAnchor, constant: 12),
-            mediaLabel.trailingAnchor.constraint(equalTo: dropBox.contentView!.trailingAnchor, constant: -12),
+            mediaLabel.leadingAnchor.constraint(equalTo: dropContent.leadingAnchor, constant: 12),
+            mediaLabel.trailingAnchor.constraint(equalTo: dropContent.trailingAnchor, constant: -12),
 
             profileBox.topAnchor.constraint(equalTo: dropBox.bottomAnchor, constant: 12),
             profileBox.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             profileBox.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            profileBox.heightAnchor.constraint(equalToConstant: 80),
+            profileBox.heightAnchor.constraint(equalToConstant: 100),
 
-            profilePopUp.centerXAnchor.constraint(equalTo: profileBox.contentView!.centerXAnchor),
-            profilePopUp.centerYAnchor.constraint(equalTo: profileBox.contentView!.centerYAnchor),
+            profilePopUp.centerXAnchor.constraint(equalTo: profileContent.centerXAnchor),
+            profilePopUp.topAnchor.constraint(equalTo: profileContent.topAnchor, constant: 10),
             profilePopUp.widthAnchor.constraint(greaterThanOrEqualToConstant: 320),
+
+            hwEncodeCheckbox.centerXAnchor.constraint(equalTo: profileContent.centerXAnchor),
+            hwEncodeCheckbox.topAnchor.constraint(equalTo: profilePopUp.bottomAnchor, constant: 8),
 
             destBox.topAnchor.constraint(equalTo: profileBox.bottomAnchor, constant: 12),
             destBox.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             destBox.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             destBox.heightAnchor.constraint(equalToConstant: 90),
 
-            destStack.centerXAnchor.constraint(equalTo: destBox.contentView!.centerXAnchor),
-            destStack.centerYAnchor.constraint(equalTo: destBox.contentView!.centerYAnchor),
+            destStack.centerXAnchor.constraint(equalTo: destContent.centerXAnchor),
+            destStack.centerYAnchor.constraint(equalTo: destContent.centerYAnchor),
 
             progressBar.topAnchor.constraint(equalTo: destBox.bottomAnchor, constant: 12),
             progressBar.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
@@ -283,6 +320,10 @@ class ConvertStreamWindowController: NSWindowController {
         alert.runModal()
     }
 
+    @objc private func hwEncodeToggled(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: Defaults.convertHardwareEncoding)
+    }
+
     @objc private func goClicked() {
         guard let input = selectedInputURL else { return }
         let profile = Self.profiles[profilePopUp.indexOfSelectedItem]
@@ -316,7 +357,8 @@ class ConvertStreamWindowController: NSWindowController {
             statusLabel.stringValue = L("Failed to open input file")
             return
         }
-        let sout = profile.soutOption(outputPath: output.path)
+        let useHW = UserDefaults.standard.bool(forKey: Defaults.convertHardwareEncoding)
+        let sout = profile.soutOption(outputPath: output.path, useHardwareEncoder: useHW)
         libvlc_media_add_option(media, sout)
         // `:no-sout-all` skips passthrough streams we didn't transcode (subs).
         // `:sout-keep` is harmless but keeps the chain alive between media.
@@ -343,6 +385,7 @@ class ConvertStreamWindowController: NSWindowController {
         saveButton.isEnabled = false
         streamButton.isEnabled = false
         profilePopUp.isEnabled = false
+        hwEncodeCheckbox.isEnabled = false
         progressBar.isHidden = false
         progressBar.doubleValue = 0
         statusLabel.stringValue = L("Converting…")
@@ -405,6 +448,7 @@ class ConvertStreamWindowController: NSWindowController {
         saveButton.isEnabled = true
         streamButton.isEnabled = true
         profilePopUp.isEnabled = true
+        hwEncodeCheckbox.isEnabled = true
 
         guard let success = success else {
             // Called from deinit — just clean up, no UI updates

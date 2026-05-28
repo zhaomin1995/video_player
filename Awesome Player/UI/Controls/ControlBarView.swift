@@ -109,7 +109,12 @@ class ControlBarView: NSView {
         fullscreenButton.target = self
         fullscreenButton.action = #selector(fullscreenClicked)
         fullscreenButton.translatesAutoresizingMaskIntoConstraints = false
+        fullscreenButton.setAccessibilityLabel(L("Toggle Fullscreen"))
         effectView.addSubview(fullscreenButton)
+
+        seekSlider.setAccessibilityLabel(L("Playback Position"))
+        currentTimeLabel.setAccessibilityLabel(L("Current Time"))
+        durationLabel.setAccessibilityLabel(L("Duration"))
 
         castButton.translatesAutoresizingMaskIntoConstraints = false
         castButton.isHidden = true

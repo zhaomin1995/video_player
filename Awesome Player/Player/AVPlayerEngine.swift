@@ -106,7 +106,7 @@ class AVPlayerEngine: NSObject {
         item.preferredForwardBufferDuration = 5
         player = avPlayer
 
-        print("[AVPlayerEngine] Created player for: \(url.lastPathComponent), volume=\(avPlayer.volume), muted=\(avPlayer.isMuted)")
+        dlog(.avplayer, "Created player for: \(url.lastPathComponent), volume=\(avPlayer.volume), muted=\(avPlayer.isMuted)")
 
         setupTimeObserver()
         setupNotifications()
@@ -131,7 +131,7 @@ class AVPlayerEngine: NSObject {
 
     func play() {
         player?.rate = desiredRate
-        print("[AVPlayerEngine] play() called, rate=\(player?.rate ?? 0), volume=\(player?.volume ?? 0), status=\(playerItem?.status.rawValue ?? -1)")
+        dlog(.avplayer, "play() called, rate=\(player?.rate ?? 0), volume=\(player?.volume ?? 0), status=\(playerItem?.status.rawValue ?? -1)")
         delegate?.playerEngineDidUpdateStatus(isPlaying: true)
     }
 
@@ -288,7 +288,7 @@ class AVPlayerEngine: NSObject {
     /// (e.g. the asset load was cancelled or the item resolves from a different source).
     private func observeItemStatus() {
         itemStatusObservation = playerItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
-            print("[AVPlayerEngine] Item status changed: \(item.status.rawValue) error: \(item.error?.localizedDescription ?? "none")")
+            dlog(.avplayer, "Item status changed: \(item.status.rawValue) error: \(item.error?.localizedDescription ?? "none")")
             guard let self = self, item.status == .readyToPlay else { return }
             let dur = item.duration.seconds
             if dur.isFinite && dur > 0 {
@@ -306,7 +306,7 @@ class AVPlayerEngine: NSObject {
         externalPlaybackObservation = player?.observe(\.isExternalPlaybackActive, options: [.new]) { [weak self] player, _ in
             DispatchQueue.main.async {
                 let active = player.isExternalPlaybackActive
-                print("[AVPlayerEngine] External playback: \(active)")
+                dlog(.avplayer, "External playback: \(active)")
                 self?.delegate?.playerEngineExternalPlaybackChanged(isActive: active)
             }
         }

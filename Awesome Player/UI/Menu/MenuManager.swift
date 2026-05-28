@@ -83,155 +83,9 @@ class AudioDeviceMenuDelegate: NSObject, NSMenuDelegate {
     }
 }
 
-/// Discovers AirPlay devices via Bonjour (_airplay._tcp) and lists them in the menu.
-/// Clicking a device triggers the AVRoutePickerView in the control bar.
-class AirPlayMenuDelegate: NSObject, NSMenuDelegate, NetServiceBrowserDelegate, NetServiceDelegate {
-    static let shared = AirPlayMenuDelegate()
+// AirPlayMenuDelegate moved to UI/Menu/Delegates/AirPlayMenuDelegate.swift
 
-    private var browser: NetServiceBrowser?
-    private var services: [NetService] = []
-    private var resolvedDevices: [(name: String, host: String)] = []
-
-    override init() {
-        super.init()
-        startDiscovery()
-    }
-
-    private func startDiscovery() {
-        browser = NetServiceBrowser()
-        browser?.delegate = self
-        browser?.searchForServices(ofType: "_airplay._tcp.", inDomain: "local.")
-    }
-
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.removeAllItems()
-
-        if resolvedDevices.isEmpty {
-            let scanning = NSMenuItem(title: L("Scanning…"), action: nil, keyEquivalent: "")
-            scanning.isEnabled = false
-            menu.addItem(scanning)
-            // Restart discovery in case it timed out
-            startDiscovery()
-        } else {
-            for device in resolvedDevices {
-                menu.addItem(withTitle: device.name, action: #selector(AppDelegate.showAirPlay(_:)), keyEquivalent: "")
-            }
-        }
-    }
-
-    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
-        services.append(service)
-        service.delegate = self
-        service.resolve(withTimeout: 5.0)
-    }
-
-    func netServiceBrowser(_ browser: NetServiceBrowser, didRemove service: NetService, moreComing: Bool) {
-        services.removeAll { $0 == service }
-        resolvedDevices.removeAll { $0.name == service.name }
-    }
-
-    func netServiceDidResolveAddress(_ sender: NetService) {
-        let name = sender.name
-        let host = sender.hostName ?? sender.name
-        if !resolvedDevices.contains(where: { $0.name == name }) {
-            resolvedDevices.append((name: name, host: host))
-        }
-    }
-}
-
-/// Discovers Chromecast devices via Bonjour (_googlecast._tcp) and lists them in the menu.
-/// Extracts the friendly name from the TXT record's "fn" key, falling back to
-/// stripping the UUID suffix from the mDNS service name.
-class ChromecastMenuDelegate: NSObject, NSMenuDelegate, NetServiceBrowserDelegate, NetServiceDelegate {
-    static let shared = ChromecastMenuDelegate()
-
-    private var browser: NetServiceBrowser?
-    private var services: [NetService] = []
-    private var resolvedDevices: [(name: String, host: String, port: Int)] = []
-
-    override init() {
-        super.init()
-        startDiscovery()
-    }
-
-    private func startDiscovery() {
-        browser = NetServiceBrowser()
-        browser?.delegate = self
-        browser?.searchForServices(ofType: "_googlecast._tcp.", inDomain: "local.")
-    }
-
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.removeAllItems()
-
-        if resolvedDevices.isEmpty {
-            let scanning = NSMenuItem(title: L("Scanning…"), action: nil, keyEquivalent: "")
-            scanning.isEnabled = false
-            menu.addItem(scanning)
-            startDiscovery()
-        } else {
-            for device in resolvedDevices {
-                let item = menu.addItem(withTitle: device.name, action: #selector(AppDelegate.castToChromecast(_:)), keyEquivalent: "")
-                item.representedObject = device
-            }
-        }
-    }
-
-    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
-        services.append(service)
-        service.delegate = self
-        service.resolve(withTimeout: 5.0)
-    }
-
-    func netServiceBrowser(_ browser: NetServiceBrowser, didRemove service: NetService, moreComing: Bool) {
-        services.removeAll { $0 == service }
-        resolvedDevices.removeAll { $0.host == service.hostName }
-    }
-
-    func netServiceDidResolveAddress(_ sender: NetService) {
-        var host = sender.hostName ?? sender.name
-        // Strip trailing dot from mDNS hostname
-        if host.hasSuffix(".") { host = String(host.dropLast()) }
-
-        // Try to extract the IPv4 address directly from the resolved addresses
-        if let addresses = sender.addresses {
-            for addrData in addresses {
-                addrData.withUnsafeBytes { ptr in
-                    guard let sa = ptr.baseAddress?.assumingMemoryBound(to: sockaddr.self) else { return }
-                    if sa.pointee.sa_family == UInt8(AF_INET) {
-                        var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                        if getnameinfo(sa, socklen_t(sa.pointee.sa_len), &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST) == 0 {
-                            host = String(cString: hostname)
-                        }
-                    }
-                }
-            }
-        }
-
-        let friendlyName = Self.friendlyName(for: sender)
-        if !resolvedDevices.contains(where: { $0.host == host }) {
-            resolvedDevices.append((name: friendlyName, host: host, port: sender.port))
-        }
-    }
-
-    static func friendlyName(for service: NetService) -> String {
-        // Try TXT record "fn" (friendly name) key first
-        if let txtData = service.txtRecordData() {
-            let dict = NetService.dictionary(fromTXTRecord: txtData)
-            if let fnData = dict["fn"], let fn = String(data: fnData, encoding: .utf8), !fn.isEmpty {
-                return fn
-            }
-        }
-        // Fall back to stripping UUID suffix (e.g. "S90F-2ab6a79c..." → "S90F")
-        let raw = service.name
-        if let dashIdx = raw.firstIndex(of: "-") {
-            let suffix = raw[raw.index(after: dashIdx)...]
-            if suffix.count > 20 {
-                return String(raw[..<dashIdx])
-            }
-        }
-        return raw
-    }
-}
+// ChromecastMenuDelegate moved to UI/Menu/Delegates/ChromecastMenuDelegate.swift
 
 /// Populates Open Recent menu from a manually managed list in UserDefaults.
 class RecentDocumentsMenuDelegate: NSObject, NSMenuDelegate {
@@ -278,119 +132,7 @@ class RecentDocumentsMenuDelegate: NSObject, NSMenuDelegate {
     }
 }
 
-/// Dynamically populates audio/video/subtitle track menus when opened.
-/// Queries the active player engine for available tracks.
-class TrackMenuDelegate: NSObject, NSMenuDelegate {
-    enum TrackType { case audio, video, subtitle }
-    let trackType: TrackType
-
-    static let audio = TrackMenuDelegate(type: .audio)
-    static let video = TrackMenuDelegate(type: .video)
-    static let subtitle = TrackMenuDelegate(type: .subtitle)
-
-    init(type: TrackType) {
-        self.trackType = type
-        super.init()
-    }
-
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.removeAllItems()
-        guard let wc = NSApp.mainWindow?.windowController as? PlayerWindowController else {
-            addNoneItem(to: menu)
-            return
-        }
-        let vc = wc.playerViewController
-
-        if let vlc = vc.vlcEngine {
-            populateVLCTracks(menu: menu, vlc: vlc, vc: vc)
-        } else if let avEngine = vc.playerEngine {
-            populateAVTracks(menu: menu, engine: avEngine, vc: vc)
-        } else {
-            addNoneItem(to: menu)
-        }
-    }
-
-    private func populateVLCTracks(menu: NSMenu, vlc: VLCPlayerEngine, vc: PlayerViewController) {
-        let tracks: [VLCPlayerEngine.TrackInfo]
-        let currentId: Int
-
-        switch trackType {
-        case .audio:
-            tracks = vlc.getAudioTracks()
-            currentId = vlc.getCurrentAudioTrack()
-        case .subtitle:
-            tracks = vlc.getSubtitleTracks()
-            currentId = vlc.getCurrentSubtitleTrack()
-        case .video:
-            tracks = vlc.getVideoTracks()
-            currentId = -1
-        }
-
-        if tracks.isEmpty {
-            addNoneItem(to: menu)
-            return
-        }
-
-        for track in tracks {
-            let item = menu.addItem(withTitle: track.name, action: #selector(trackSelected(_:)), keyEquivalent: "")
-            item.tag = track.id
-            item.target = self
-            if track.id == currentId { item.state = .on }
-        }
-    }
-
-    private func populateAVTracks(menu: NSMenu, engine: AVPlayerEngine, vc: PlayerViewController) {
-        switch trackType {
-        case .audio:
-            let tracks = engine.getAudioTracks()
-            if tracks.isEmpty { addNoneItem(to: menu); return }
-            for track in tracks {
-                let item = menu.addItem(withTitle: track.name, action: #selector(trackSelected(_:)), keyEquivalent: "")
-                item.tag = track.index
-                item.target = self
-            }
-        case .subtitle:
-            let tracks = engine.getSubtitleTracks()
-            let off = menu.addItem(withTitle: "Off", action: #selector(trackSelected(_:)), keyEquivalent: "")
-            off.tag = -1
-            off.target = self
-            for track in tracks {
-                let item = menu.addItem(withTitle: track.name, action: #selector(trackSelected(_:)), keyEquivalent: "")
-                item.tag = track.index
-                item.target = self
-            }
-        case .video:
-            addNoneItem(to: menu)
-        }
-    }
-
-    @objc private func trackSelected(_ sender: NSMenuItem) {
-        guard let wc = NSApp.mainWindow?.windowController as? PlayerWindowController else { return }
-        let vc = wc.playerViewController
-        let trackId = sender.tag
-
-        if let vlc = vc.vlcEngine {
-            switch trackType {
-            case .audio: vlc.setAudioTrack(trackId)
-            case .subtitle: vlc.setSubtitleTrack(trackId)
-            case .video: vlc.setVideoTrack(trackId)
-            }
-        } else if let engine = vc.playerEngine {
-            switch trackType {
-            case .audio: engine.selectAudioTrack(at: trackId)
-            case .subtitle: engine.selectSubtitleTrack(at: trackId)
-            case .video: break
-            }
-        }
-        vc.showOSD("Track: \(sender.title)")
-    }
-
-    private func addNoneItem(to menu: NSMenu) {
-        let item = NSMenuItem(title: L("(None)"), action: nil, keyEquivalent: "")
-        item.isEnabled = false
-        menu.addItem(item)
-    }
-}
+// TrackMenuDelegate moved to UI/Menu/Delegates/TrackMenuDelegate.swift
 
 class ChapterMenuDelegate: NSObject, NSMenuDelegate {
     static let shared = ChapterMenuDelegate()
@@ -674,6 +416,7 @@ class MenuManager {
         let menu = NSMenu()
 
         menu.addItem(withTitle: L("About Awesome Player"), action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Check for Updates…"), action: #selector(AppDelegate.checkForUpdatesAction(_:)), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: L("Preferences…"), action: #selector(AppDelegate.showPreferences(_:)), keyEquivalent: ",")
         menu.addItem(.separator())
@@ -1031,6 +774,9 @@ class MenuManager {
 
         // Add Subtitle File
         menu.addItem(withTitle: L("Add Subtitle File…"), action: #selector(AppDelegate.addSubtitleFile(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L("Search OpenSubtitles…"),
+                     action: #selector(AppDelegate.searchOpenSubtitlesAction(_:)),
+                     keyEquivalent: "")
         menu.addItem(.separator())
 
         // Sync section
@@ -1113,6 +859,13 @@ class MenuManager {
         let menuItem = NSMenuItem(title: L("Help"), action: nil, keyEquivalent: "")
         let menu = NSMenu(title: L("Help"))
         menu.addItem(withTitle: L("Awesome Player Help"), action: #selector(NSApplication.showHelp(_:)), keyEquivalent: "?")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: L("Reveal Crash Logs in Finder"),
+                     action: #selector(AppDelegate.revealCrashLogsAction(_:)),
+                     keyEquivalent: "")
+        menu.addItem(withTitle: L("Report an Issue on GitHub"),
+                     action: #selector(AppDelegate.reportIssueAction(_:)),
+                     keyEquivalent: "")
         NSApplication.shared.helpMenu = menu
         menuItem.submenu = menu
         return menuItem

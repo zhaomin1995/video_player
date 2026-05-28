@@ -127,7 +127,8 @@ final class LanguageManager {
             customBundle = nil
             UserDefaults.standard.removeObject(forKey: "AppleLanguages")
         }
-        UserDefaults.standard.synchronize()
+        // synchronize() was a no-op since macOS 10.15 — UserDefaults flushes
+        // automatically when the app suspends or terminates.
         NotificationCenter.default.post(name: .languageDidChange, object: nil)
     }
 }

@@ -14,33 +14,39 @@ A full-featured macOS video player combining Dolby Vision playback with AirPlay 
 ### Directory Structure
 ```
 Awesome Player/
-├── App/            # AppDelegate, main.swift, Info.plist, AppIcon,
-│                   # Localizable.xcstrings (Xcode 15 single-file i18n catalog, 11 locales)
+├── App/            # AppDelegate, URLOpenCoordinator (Open URL… / yt-dlp flow),
+│                   # main.swift, Info.plist, AppIcon, Localizable.xcstrings (11 locales)
 ├── Player/         # AVPlayerEngine, VLCPlayerEngine (+AudioEqualizerPreset), ABLoopController,
-│                   # NowPlayingController, ResumeManager
+│                   # ChapterNavigation (pure helpers, testable),
+│                   # NowPlayingController, ResumeManager, OpenSubtitlesService (REST + Keychain)
 ├── Audio/          # AudioPassthrough, AudioPassthroughManager
-├── Casting/        # CastingManager, ChromecastManager (Cast V2), DLNAManager, CastingHTTPServer
+├── Casting/        # CastingManager, ChromecastManager (Cast V2), DLNAManager, CastingHTTPServer,
+│                   # AirPlayCastManager
 ├── Media/          # MediaInfo, SubtitleParser/Manager, PlaylistManager
 ├── FFmpeg/         # FFmpegBridge (Obj-C prober/remuxer/subtitle extractor), bridging header
 ├── UI/
 │   ├── Window/     # PlayerWindow (borderless), PlayerWindowController, TitleBarView (badges)
 │   ├── Player/     # PlayerViewController, VideoView, SubtitleOverlayView, WelcomeView,
 │   │               # PlaylistPanelView, VideoEQPanelController, MediaInspectorController,
-│   │               # ConvertStreamWindowController (+SystemUsageSampler)
+│   │               # ConvertStreamWindowController (+SystemUsageSampler), ScreenshotSaver,
+│   │               # OpenSubtitlesSearchWindow
 │   ├── Controls/   # ControlBarView, SeekSliderView, VolumeSliderView, PlaybackButtons,
 │   │               # SpeedButton, CastButton
 │   ├── OSD/        # OSDView (on-screen display messages)
-│   ├── Menu/       # MenuManager (all menus + PlaybackSpeedSliderView, SubtitleOpacitySliderView,
-│   │               # PlaybackMenuDelegate, SubtitleMenuDelegate, EditMenuDelegate),
-│   │               # AudioDeviceMenuDelegate, AirPlayMenuDelegate, ChromecastMenuDelegate,
-│   │               # RecentDocumentsMenuDelegate, TrackMenuDelegate (audio/video/subtitle)
+│   ├── Menu/       # MenuManager (top-level + remaining smaller delegates),
+│   │   └── Delegates/  # AirPlayMenuDelegate, ChromecastMenuDelegate, TrackMenuDelegate
 │   └── Preferences/# PreferencesWindowController (9-tab, live language switch, LanguagePicker)
 └── Utilities/      # Extensions (L() helper, LanguageManager, .languageDidChange notif),
-                    # Defaults (90+ preference keys across 9 categories)
+                    # Defaults (~60 preference keys), KeyBindingManager, UpdateChecker,
+                    # Logging (dlog/wlog façade — see "Logging" pitfall below)
 Vendor/
 ├── ffmpeg/         # Bundled FFmpeg headers + dylibs
 ├── libvlc/         # Bundled libvlc headers, dylibs, plugins, libvlc_compat.h
 └── yt-dlp/         # Bundled yt-dlp macOS binary + Python 3.14 runtime (_internal/)
+
+# NOTE: Vendor/VLCKit (~1.6 GB) was the Objective-C wrapper around libvlc.
+# We don't use it — every Swift file calls libvlc's C API directly (lower
+# overhead, finer control). Deleted from the repo to shrink clone size.
 ```
 
 ### Build & Run
@@ -223,6 +229,18 @@ The first release was `v1.0` at https://github.com/zhaomin1995/awesome_player/re
 - Adding a new Swift file when not using Xcode requires manual edits to `project.pbxproj` at four spots: PBXBuildFile entry, PBXFileReference entry, group children list, and PBXSourcesBuildPhase / PBXResourcesBuildPhase files list. UUIDs in our project follow `A100XX` (build) and `F100XX` (file ref) pattern — pick unused IDs (e.g. `A10100`+) and reuse them in all four spots
 - macOS auto-adds Emoji & Symbols via `orderFrontCharacterPalette:` selector and Start Dictation via `startDictation:` selector. These are public AppKit selectors — match by name for robust cross-locale stripping
 - Floating panel controllers (`MediaInspectorController`, `VideoEQPanelController`) bake L() values at init time into NSTextField labels and have no live-refresh logic. On `.languageDidChange`, AppDelegate must nil them so the next open builds fresh views with new-locale strings. `PreferencesWindowController` is the exception — it observes the notification itself and rebuilds its tabs in place
+- **Logging** — never use raw `print()` in production code. Use `dlog(.category, msg)` for debug-only verbose chatter (compiles to no-op in Release) and `wlog(.category, msg)` for genuinely-anomalous events (always emitted via `os_log` to Console.app). Earlier builds dumped device names, codec ids, and file paths to the unified log unfiltered. See `Utilities/Logging.swift`. The `castLog` in ChromecastManager is the one historical exception — it's already wrapped in `#if DEBUG`
+- **Hot-path UserDefaults** — read in handlers fired per-event (keyDown, scrollWheel, time observer) must be cached to a stored property and refreshed via `UserDefaults.didChangeNotification`. See `PlayerViewController.refreshCachedPreferences()` for the pattern. Re-reading from UserDefaults inside a tight event loop both wastes cycles and can return a value mid-mutation
+- **Thumbnail cache** — `SeekSliderView.thumbnailCache` is an `NSCache` with `totalCostLimit` (bytes), NOT a `[Int: NSImage]` with a hard-count ceiling. The old dict-based cache wiped itself wholesale at 150 entries, defeating caching on long films. Cost passed when inserting is `width * height * 4` (RGBA bytes)
+- **Subtitle lookup** — `SubtitleManager.subtitle(at:)` does (a) probe currentIndex + neighbours (O(1) for monotonic playback) then (b) binary-search by `startTime` (O(log n)). Never reintroduce a linear scan — ASS files routinely have 5k+ cues and this fires 4×/s
+- **Orphaned Defaults** — Preferences toggles that don't have a reader anywhere in the player should be deleted, NOT silently registered. A toggle that lies about doing something is worse than no toggle. If you add a new pref to `Defaults.swift`, also wire a reader (or don't add the UI row). Run `grep -rn "Defaults.<key>"` to confirm every key has at least one non-Prefs/non-Defaults reader
+- **OpenSubtitles credentials** — API key + password live in macOS Keychain (generic-password, `service: com.awesomeplayer.opensubs`). Don't add a UserDefaults binding for them in the Preferences pane — the field uses `addKeychainFieldRow` which routes through `OpenSubtitlesService.setAPIKey` / `setCredentials`. Username is the one exception (UserDefaults — not sensitive, and the Keychain item needs the account string to look up the password)
+- **ATS** — `NSAllowsArbitraryLoads` is OFF. Control-plane traffic (UpdateChecker, OpenSubtitlesService) must be HTTPS. AVPlayer can use cleartext for user-pasted media URLs because `NSAllowsArbitraryLoadsInMedia` is ON. Cast HTTP serve on the LAN works via `NSAllowsLocalNetworking`. Do NOT re-enable the global toggle — allowlist specific hosts via `NSExceptionDomains` instead
+- **Hardened Runtime** — `ENABLE_HARDENED_RUNTIME = YES` is on; `com.apple.security.cs.disable-library-validation` is in the entitlements so adhoc-signed bundled libvlc plugins/dylibs still load. The proper future fix is `Scripts/sign-vendors.sh` codesigning every dylib with the app's identity, then dropping the entitlement
+- **DV remux race** — `openFile` nils `playbackStatusObservation` BEFORE swapping engines, and the inner remux callback guards on `self.currentFileURL == url` so a stale probe completion can't clobber the new engine. The KVO closure captures `[weak engine]` for the same reason. Don't relax these guards — without them, opening a second file mid-probe leaks the prior engine and may double-trigger remux
+- **DV temp .mp4 cleanup** — `PlayerViewController` tracks `dvRemuxOutputURL` and deletes the prior one on each `openFile`; `purgeOrphanedDVRemuxFiles` runs at viewDidLoad to sweep up files left behind by a previous crashed run. Naming convention is `<UUID>_full.mp4` in `temporaryDirectory` — match the suffix exactly
+- **Cast source URL** — Chromecast/AirPlay handlers must read `vc.playbackSourceURL`, NOT `vc.currentFileURL` or `currentItem.asset as? AVURLAsset`. For DV files the engine is decoding the remuxed `.mp4`, but the source URL is still the original `.mkv` the receiver can't decode
+- **Chapter navigation** — use `ChapterNavigation.nextChapterIndex` / `previousChapterIndex`, NOT inline `firstIndex(where:)` against `currentTime ± tolerance`. The old tolerance approach silently skipped chapters less than 1-2s apart. The helper uses the "containing chapter" definition (chapter whose [start, nextStart) range covers the time) and is unit-tested
 
 ### Casting Dolby Vision (currently unsupported — see findings)
 

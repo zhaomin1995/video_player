@@ -35,6 +35,12 @@ class PlaybackButtons: NSView {
         configureButton(seekForwardButton, symbol: "goforward.5", action: #selector(seekForwardClicked))
         configureButton(nextButton, symbol: "forward.end.fill", action: #selector(nextClicked))
 
+        prevButton.setAccessibilityLabel(L("Previous"))
+        seekBackButton.setAccessibilityLabel(L("Seek Backward"))
+        playPauseButton.setAccessibilityLabel(L("Play / Pause"))
+        seekForwardButton.setAccessibilityLabel(L("Seek Forward"))
+        nextButton.setAccessibilityLabel(L("Next"))
+
         playPauseButton.widthAnchor.constraint(equalToConstant: 30).isActive = true
         playPauseButton.heightAnchor.constraint(equalToConstant: 28).isActive = true
 
@@ -67,6 +73,9 @@ class PlaybackButtons: NSView {
     func setPlaying(_ playing: Bool) {
         let symbol = playing ? "pause.fill" : "play.fill"
         playPauseButton.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        // Keep the VoiceOver label in sync with the toggled state so blind
+        // users hear the current action, not the original "Play / Pause".
+        playPauseButton.setAccessibilityLabel(playing ? L("Pause") : L("Play"))
     }
 
     @objc private func prevClicked() { onPrevious?() }

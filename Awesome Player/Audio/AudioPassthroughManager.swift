@@ -106,7 +106,7 @@ class AudioPassthroughManager {
 
         if configureDeviceForEncoded(device) {
             isPassthroughActive = true
-            print("[Passthrough] Activated on \(device.deviceName)")
+            dlog(.audio, "Passthrough activated on \(device.deviceName)")
             delegate?.passthroughStateChanged(isActive: true, deviceName: device.deviceName)
         }
     }
@@ -115,7 +115,7 @@ class AudioPassthroughManager {
         guard isPassthroughActive else { return }
         restoreDeviceFormat()
         isPassthroughActive = false
-        print("[Passthrough] Deactivated")
+        dlog(.audio, "Passthrough deactivated")
         delegate?.passthroughStateChanged(isActive: false, deviceName: nil)
     }
 
@@ -174,7 +174,7 @@ class AudioPassthroughManager {
                 savedStreamID = streamID
                 return true
             } else {
-                print("[Passthrough] Failed to set encoded format: \(status)")
+                wlog(.audio, "Passthrough: failed to set encoded format: \(status)")
             }
         }
 

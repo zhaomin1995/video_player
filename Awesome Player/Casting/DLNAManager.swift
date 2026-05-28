@@ -41,7 +41,7 @@ class DLNAManager {
         guard let controlURL = controlURL else {
             fetchDeviceDescription(device: device) { [weak self] ctrl in
                 guard let self = self, let ctrl = ctrl else {
-                    print("[DLNA] couldn't resolve controlURL for \(device.host)")
+                    wlog(.dlna, "couldn't resolve controlURL for \(device.host)")
                     return
                 }
                 self.controlURL = ctrl
@@ -157,7 +157,7 @@ class DLNAManager {
 
         let sock = socket(AF_INET, SOCK_DGRAM, 0)
         guard sock >= 0 else {
-            print("[DLNA] socket() failed")
+            wlog(.dlna, "socket() failed")
             return
         }
 
@@ -180,7 +180,7 @@ class DLNAManager {
                 Darwin.bind(sock, sa, socklen_t(MemoryLayout<sockaddr_in>.size))
             }
         }
-        if bindRet < 0 { print("[DLNA] bind failed"); close(sock); return }
+        if bindRet < 0 { wlog(.dlna, "bind failed"); close(sock); return }
 
         // Multicast destination 239.255.255.250:1900
         var dest = sockaddr_in()
@@ -194,7 +194,7 @@ class DLNAManager {
                   "MAN: \"ssdp:discover\"\r\n" +
                   "MX: 3\r\n" +
                   "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n\r\n"
-        let data = msg.data(using: .utf8)!
+        let data = msg.data(using: .utf8) ?? Data()
         let sent = data.withUnsafeBytes { buf -> Int in
             withUnsafePointer(to: &dest) { destPtr in
                 destPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
@@ -202,7 +202,7 @@ class DLNAManager {
                 }
             }
         }
-        if sent < 0 { print("[DLNA] sendto failed"); close(sock); return }
+        if sent < 0 { wlog(.dlna, "sendto failed"); close(sock); return }
 
         ssdpSocket = sock
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in

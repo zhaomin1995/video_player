@@ -108,6 +108,7 @@ class CastButton: NSView {
         } else {
             btn.title = L("AirPlay")
         }
+        btn.setAccessibilityLabel(L("AirPlay / Cast"))
         addSubview(btn)
         customButton = btn
         NSLayoutConstraint.activate([

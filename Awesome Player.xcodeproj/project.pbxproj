@@ -9,7 +9,9 @@
 /* Begin PBXBuildFile section */
 		A10014 /* AVPlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10014 /* AVPlayerEngine.swift */; };
 		A10080 /* VLCPlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10080 /* VLCPlayerEngine.swift */; };
+		A10320 /* ChapterNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10320 /* ChapterNavigation.swift */; };
 		A10001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10001 /* AppDelegate.swift */; };
+		A10002 /* URLOpenCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10002 /* URLOpenCoordinator.swift */; };
 		A10005 /* AudioPassthrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10005 /* AudioPassthrough.swift */; };
 		A10009 /* MediaInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10009 /* MediaInfo.swift */; };
 		A10010 /* PlaylistManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10010 /* PlaylistManager.swift */; };
@@ -28,6 +30,7 @@
 		A10024 /* MenuManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10024 /* MenuManager.swift */; };
 		A10025 /* OSDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10025 /* OSDView.swift */; };
 		A10026 /* PlayerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10026 /* PlayerViewController.swift */; };
+		A10300 /* ScreenshotSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10300 /* ScreenshotSaver.swift */; };
 		A10027 /* SubtitleOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10027 /* SubtitleOverlayView.swift */; };
 		A10028 /* VideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10028 /* VideoView.swift */; };
 		A10029 /* PlayerWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10029 /* PlayerWindow.swift */; };
@@ -50,13 +53,22 @@
 		A10110 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F10110 /* Localizable.xcstrings */; };
 		A10100 /* ConvertStreamWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10100 /* ConvertStreamWindowController.swift */; };
 		A10090 /* KeyBindingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10090 /* KeyBindingManager.swift */; };
+		A10091 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10091 /* UpdateChecker.swift */; };
+		A10092 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10092 /* Logging.swift */; };
+		A10400 /* AirPlayMenuDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10400 /* AirPlayMenuDelegate.swift */; };
+		A10401 /* ChromecastMenuDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10401 /* ChromecastMenuDelegate.swift */; };
+		A10402 /* TrackMenuDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10402 /* TrackMenuDelegate.swift */; };
+		A10310 /* OpenSubtitlesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10310 /* OpenSubtitlesService.swift */; };
+		A10311 /* OpenSubtitlesSearchWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10311 /* OpenSubtitlesSearchWindow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		F10014 /* AVPlayerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerEngine.swift; sourceTree = "<group>"; };
 		F10080 /* VLCPlayerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLCPlayerEngine.swift; sourceTree = "<group>"; };
+		F10320 /* ChapterNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChapterNavigation.swift; sourceTree = "<group>"; };
 		E55EEC062FC230F3000EE159 /* AudioPassthroughManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPassthroughManager.swift; sourceTree = "<group>"; };
 		F10001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		F10002 /* URLOpenCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLOpenCoordinator.swift; sourceTree = "<group>"; };
 		F10005 /* AudioPassthrough.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPassthrough.swift; sourceTree = "<group>"; };
 		F10009 /* MediaInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaInfo.swift; sourceTree = "<group>"; };
 		F10010 /* PlaylistManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistManager.swift; sourceTree = "<group>"; };
@@ -75,6 +87,7 @@
 		F10024 /* MenuManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuManager.swift; sourceTree = "<group>"; };
 		F10025 /* OSDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSDView.swift; sourceTree = "<group>"; };
 		F10026 /* PlayerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewController.swift; sourceTree = "<group>"; };
+		F10300 /* ScreenshotSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSaver.swift; sourceTree = "<group>"; };
 		F10027 /* SubtitleOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleOverlayView.swift; sourceTree = "<group>"; };
 		F10028 /* VideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoView.swift; sourceTree = "<group>"; };
 		F10029 /* PlayerWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerWindow.swift; sourceTree = "<group>"; };
@@ -99,6 +112,13 @@
 		F10082 /* MediaInspectorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaInspectorController.swift; sourceTree = "<group>"; };
 		F10100 /* ConvertStreamWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvertStreamWindowController.swift; sourceTree = "<group>"; };
 		F10090 /* KeyBindingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyBindingManager.swift; sourceTree = "<group>"; };
+		F10091 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
+		F10092 /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
+		F10400 /* AirPlayMenuDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayMenuDelegate.swift; sourceTree = "<group>"; };
+		F10401 /* ChromecastMenuDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromecastMenuDelegate.swift; sourceTree = "<group>"; };
+		F10402 /* TrackMenuDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackMenuDelegate.swift; sourceTree = "<group>"; };
+		F10310 /* OpenSubtitlesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenSubtitlesService.swift; sourceTree = "<group>"; };
+		F10311 /* OpenSubtitlesSearchWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenSubtitlesSearchWindow.swift; sourceTree = "<group>"; };
 		F10099 /* Awesome Player.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Awesome Player.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -141,6 +161,7 @@
 			children = (
 				F10060 /* main.swift */,
 				F10001 /* AppDelegate.swift */,
+				F10002 /* URLOpenCoordinator.swift */,
 				F10034 /* Info.plist */,
 				F10110 /* Localizable.xcstrings */,
 			);
@@ -155,6 +176,8 @@
 				D6342BF8EECB4E2C93F2FBA9 /* ResumeManager.swift */,
 				F10014 /* AVPlayerEngine.swift */,
 				F10080 /* VLCPlayerEngine.swift */,
+				F10310 /* OpenSubtitlesService.swift */,
+				F10320 /* ChapterNavigation.swift */,
 			);
 			path = Player;
 			sourceTree = "<group>";
@@ -219,9 +242,11 @@
 			isa = PBXGroup;
 			children = (
 				F10026 /* PlayerViewController.swift */,
+				F10300 /* ScreenshotSaver.swift */,
 				F10027 /* SubtitleOverlayView.swift */,
 				F10028 /* VideoView.swift */,
 				F10070 /* WelcomeView.swift */,
+				F10311 /* OpenSubtitlesSearchWindow.swift */,
 				D6342BFA0000000000000001 /* PlaylistPanelView.swift */,
 				F10081 /* VideoEQPanelController.swift */,
 				F10082 /* MediaInspectorController.swift */,
@@ -262,8 +287,19 @@
 			isa = PBXGroup;
 			children = (
 				F10024 /* MenuManager.swift */,
+				G00410 /* Delegates */,
 			);
 			path = Menu;
+			sourceTree = "<group>";
+		};
+		G00410 /* Delegates */ = {
+			isa = PBXGroup;
+			children = (
+				F10400 /* AirPlayMenuDelegate.swift */,
+				F10401 /* ChromecastMenuDelegate.swift */,
+				F10402 /* TrackMenuDelegate.swift */,
+			);
+			path = Delegates;
 			sourceTree = "<group>";
 		};
 		G00067 /* Preferences */ = {
@@ -290,6 +326,8 @@
 				F10032 /* Defaults.swift */,
 				F10033 /* Extensions.swift */,
 				F10090 /* KeyBindingManager.swift */,
+				F10091 /* UpdateChecker.swift */,
+				F10092 /* Logging.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -413,6 +451,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10001 /* AppDelegate.swift in Sources */,
+				A10002 /* URLOpenCoordinator.swift in Sources */,
 				A10005 /* AudioPassthrough.swift in Sources */,
 				A10009 /* MediaInfo.swift in Sources */,
 				A10010 /* PlaylistManager.swift in Sources */,
@@ -424,6 +463,7 @@
 				D6342BFB0000000000000002 /* PlaylistPanelView.swift in Sources */,
 				A10014 /* AVPlayerEngine.swift in Sources */,
 				A10080 /* VLCPlayerEngine.swift in Sources */,
+				A10320 /* ChapterNavigation.swift in Sources */,
 				E55EEC072FC230F3000EE159 /* AudioPassthroughManager.swift in Sources */,
 				A10018 /* CastButton.swift in Sources */,
 				A10019 /* ControlBarView.swift in Sources */,
@@ -432,8 +472,12 @@
 				A10022 /* SpeedButton.swift in Sources */,
 				A10023 /* VolumeSliderView.swift in Sources */,
 				A10024 /* MenuManager.swift in Sources */,
+				A10400 /* AirPlayMenuDelegate.swift in Sources */,
+				A10401 /* ChromecastMenuDelegate.swift in Sources */,
+				A10402 /* TrackMenuDelegate.swift in Sources */,
 				A10025 /* OSDView.swift in Sources */,
 				A10026 /* PlayerViewController.swift in Sources */,
+				A10300 /* ScreenshotSaver.swift in Sources */,
 				A10027 /* SubtitleOverlayView.swift in Sources */,
 				A10028 /* VideoView.swift in Sources */,
 				A10029 /* PlayerWindow.swift in Sources */,
@@ -454,6 +498,10 @@
 				A10082 /* MediaInspectorController.swift in Sources */,
 				A10100 /* ConvertStreamWindowController.swift in Sources */,
 				A10090 /* KeyBindingManager.swift in Sources */,
+				A10091 /* UpdateChecker.swift in Sources */,
+				A10092 /* Logging.swift in Sources */,
+				A10310 /* OpenSubtitlesService.swift in Sources */,
+				A10311 /* OpenSubtitlesSearchWindow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -515,6 +563,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -556,6 +605,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
