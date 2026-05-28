@@ -190,6 +190,18 @@ class VLCPlayerEngine {
             // is enough to absorb any disk-read jitter on local files.
             libvlc_media_add_option(m, ":file-caching=100")
             libvlc_media_add_option(m, ":network-caching=300")
+
+            // Video decode mode (preference: 0=Auto, 1=Force HW, 2=Force SW)
+            // Default leaves libvlc to pick (it auto-prefers VideoToolbox on macOS).
+            // Force HW makes any decoder fall back to error rather than software —
+            // useful for benchmarking. Force SW disables HW entirely, useful for
+            // working around codec-specific HW decoder bugs (older 10-bit content,
+            // unusual color formats, etc.).
+            switch UserDefaults.standard.integer(forKey: Defaults.videoDecodeMode) {
+            case 1: libvlc_media_add_option(m, ":avcodec-hw=videotoolbox")
+            case 2: libvlc_media_add_option(m, ":avcodec-hw=none")
+            default: break // Auto — let libvlc choose
+            }
         }
 
         player = libvlc_media_player_new_from_media(media)

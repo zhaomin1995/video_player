@@ -49,8 +49,32 @@ class PlayerViewController: NSViewController {
 
     private func resizeWindowToFitVideo(_ videoSize: NSSize) {
         guard let window = view.window, let screenFrame = (window.screen ?? NSScreen.main)?.visibleFrame else { return }
-        let scale = min(screenFrame.width * 0.7 / videoSize.width, screenFrame.height * 0.7 / videoSize.height, 2.0)
-        let newSize = NSSize(width: max(640, videoSize.width * scale), height: max(360, videoSize.height * scale))
+
+        // Apply Smart Zoom: upscale floor for small videos. The preference is a
+        // percentage (100 = no upscale, 150-400 = upscale floor). Example: a 480p
+        // video with smartZoom=200 displays at 960p minimum.
+        let smartZoom = max(100, UserDefaults.standard.integer(forKey: Defaults.smartZoomPercent))
+        let effectiveSize = NSSize(
+            width: videoSize.width * CGFloat(smartZoom) / 100,
+            height: videoSize.height * CGFloat(smartZoom) / 100
+        )
+
+        // User default width: if set (>0), force the window to that width and
+        // compute the matching aspect-preserved height. Otherwise fit-to-screen
+        // at 70% of the smaller dimension.
+        let userWidth = UserDefaults.standard.integer(forKey: Defaults.userDefaultWidth)
+        let newSize: NSSize
+        if userWidth > 0 {
+            let aspect = effectiveSize.height / effectiveSize.width
+            let w = min(CGFloat(userWidth), screenFrame.width)
+            newSize = NSSize(width: w, height: w * aspect)
+        } else {
+            let scale = min(screenFrame.width * 0.7 / effectiveSize.width,
+                            screenFrame.height * 0.7 / effectiveSize.height,
+                            2.0)
+            newSize = NSSize(width: max(640, effectiveSize.width * scale),
+                             height: max(360, effectiveSize.height * scale))
+        }
         window.setContentSize(newSize)
         window.center()
     }

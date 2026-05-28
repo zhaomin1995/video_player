@@ -42,6 +42,9 @@ enum Defaults {
     static let defaultBrightness = "video.defaultBrightness"
     static let defaultContrast = "video.defaultContrast"
     static let defaultSaturation = "video.defaultSaturation"
+    static let videoDecodeMode = "video.decodeMode"       // 0=Auto, 1=HW force, 2=SW force
+    static let userDefaultWidth = "video.userDefaultWidth"  // 0 = use video native
+    static let smartZoomPercent = "video.smartZoomPercent"  // 100 = no upscale; 150-400 = upscale floor
 
     // MARK: - Audio
     static let defaultVolume = "audio.defaultVolume"
@@ -134,6 +137,9 @@ enum Defaults {
             defaultBrightness: 0.0,
             defaultContrast: 1.0,
             defaultSaturation: 1.0,
+            videoDecodeMode: 0,           // 0=Auto (default — let libvlc/AVPlayer pick), 1=Force HW, 2=Force SW
+            userDefaultWidth: 0,          // 0 = follow video native size; otherwise force this width in pt
+            smartZoomPercent: 100,        // 100 = no upscale; 150-400 = upscale floor for small videos
             screenshotFormat: 0,         // 0=PNG, 1=JPEG, 2=TIFF
             screenshotSavePath: 0,       // 0=Desktop, 1=Pictures, 2=Downloads, 3=Custom
             defaultVolume: 1.0,

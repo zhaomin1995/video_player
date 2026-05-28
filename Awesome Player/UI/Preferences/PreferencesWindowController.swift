@@ -346,22 +346,35 @@ class VideoPrefsView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         let stack = makePrefsStack()
-        addSectionHeader(stack, "Display")
-        addPopupRow(stack, "Default aspect ratio:", key: Defaults.defaultAspectRatio, items: ["Auto", "4:3", "16:9", "16:10", "2.35:1", "2.39:1"])
-        addPopupRow(stack, "Default window size:", key: Defaults.defaultVideoSize, items: ["Fit to Screen", "Original Size", "Half Size", "Double Size", "50%", "75%", "150%", "200%"])
-        addPopupRow(stack, "Fill screen mode:", key: Defaults.fillScreenMode, items: ["Stretch to Fill", "Crop to Fill"])
+        addSectionHeader(stack, L("Display"))
+        addPopupRow(stack, L("Default aspect ratio:"), key: Defaults.defaultAspectRatio, items: [L("Auto"), "4:3", "16:9", "16:10", "2.35:1", "2.39:1"])
+        addPopupRow(stack, L("Default window size:"), key: Defaults.defaultVideoSize, items: [L("Fit to Screen"), L("Original Size"), L("Half Size"), L("Double Size"), "50%", "75%", "150%", "200%"])
+        addPopupRow(stack, L("Fill screen mode:"), key: Defaults.fillScreenMode, items: [L("Stretch to Fill"), L("Crop to Fill")])
 
-        addSectionHeader(stack, "HDR")
-        addPopupRow(stack, "HDR tone mapping:", key: Defaults.hdrToneMappingMode, items: ["System Default", "Always HDR", "Force SDR"])
+        // User-specified default window width — overrides "Default window size"
+        // when > 0. Aspect ratio is preserved from the video's native size.
+        // 0 means "follow native video size (with smart-zoom upscale)".
+        addSliderRow(stack, L("Default window width (px, 0 = auto):"), min: 0, max: 3840, value: 0, key: Defaults.userDefaultWidth)
 
-        addSectionHeader(stack, "Video Equalizer Defaults")
-        addSliderRow(stack, "Brightness:", min: -0.5, max: 0.5, value: 0, key: Defaults.defaultBrightness)
-        addSliderRow(stack, "Contrast:", min: 0.5, max: 2.0, value: 1.0, key: Defaults.defaultContrast)
-        addSliderRow(stack, "Saturation:", min: 0, max: 2.0, value: 1.0, key: Defaults.defaultSaturation)
+        // Smart Zoom: upscale floor for small videos. 100% = no upscale,
+        // 200% = small videos display at 2× their native resolution minimum
+        // (so a 480p clip on a 5K display doesn't appear postage-stamp sized).
+        addSliderRow(stack, L("Smart zoom (%):"), min: 100, max: 400, value: 100, key: Defaults.smartZoomPercent)
 
-        addSectionHeader(stack, "Screenshot")
-        addPopupRow(stack, "Format:", key: Defaults.screenshotFormat, items: ["PNG", "JPEG", "TIFF"])
-        addPopupRow(stack, "Save to:", key: Defaults.screenshotSavePath, items: ["Desktop", "Pictures", "Downloads", "Custom…"])
+        addSectionHeader(stack, L("Decoder"))
+        addPopupRow(stack, L("Video decode:"), key: Defaults.videoDecodeMode, items: [L("Auto (recommended)"), L("Force Hardware (VideoToolbox)"), L("Force Software")])
+
+        addSectionHeader(stack, L("HDR"))
+        addPopupRow(stack, L("HDR tone mapping:"), key: Defaults.hdrToneMappingMode, items: [L("System Default"), L("Always HDR"), L("Force SDR")])
+
+        addSectionHeader(stack, L("Video Equalizer Defaults"))
+        addSliderRow(stack, L("Brightness:"), min: -0.5, max: 0.5, value: 0, key: Defaults.defaultBrightness)
+        addSliderRow(stack, L("Contrast:"), min: 0.5, max: 2.0, value: 1.0, key: Defaults.defaultContrast)
+        addSliderRow(stack, L("Saturation:"), min: 0, max: 2.0, value: 1.0, key: Defaults.defaultSaturation)
+
+        addSectionHeader(stack, L("Screenshot"))
+        addPopupRow(stack, L("Format:"), key: Defaults.screenshotFormat, items: ["PNG", "JPEG", "TIFF"])
+        addPopupRow(stack, L("Save to:"), key: Defaults.screenshotSavePath, items: [L("Desktop"), L("Pictures"), L("Downloads"), L("Custom…")])
         embed(stack)
     }
     required init?(coder: NSCoder) { fatalError() }
