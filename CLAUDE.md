@@ -20,8 +20,9 @@ Awesome Player/
 │                   # ChapterNavigation (pure helpers, testable),
 │                   # NowPlayingController, ResumeManager, OpenSubtitlesService (REST + Keychain)
 ├── Audio/          # AudioPassthrough, AudioPassthroughManager
-├── Casting/        # CastingManager, ChromecastManager (Cast V2), DLNAManager, CastingHTTPServer,
-│                   # AirPlayCastManager
+├── Casting/        # CastingManager, ChromecastManager (Cast V2 facade), CastV2Connection
+│                   # (protobuf framing + TLS socket), CastingHTTPClient (shared SOAP helper),
+│                   # DLNAManager, CastingHTTPServer, AirPlayCastManager
 ├── Media/          # MediaInfo, SubtitleParser/Manager, PlaylistManager
 ├── FFmpeg/         # FFmpegBridge (Obj-C prober/remuxer/subtitle extractor), bridging header
 ├── UI/
@@ -35,7 +36,9 @@ Awesome Player/
 │   ├── OSD/        # OSDView (on-screen display messages)
 │   ├── Menu/       # MenuManager (top-level + remaining smaller delegates),
 │   │   └── Delegates/  # AirPlayMenuDelegate, ChromecastMenuDelegate, TrackMenuDelegate
-│   └── Preferences/# PreferencesWindowController (9-tab, live language switch, LanguagePicker)
+│   └── Preferences/# PreferencesWindowController (9-tab, live language switch, LanguagePicker);
+│                   # `BasePrefsView` consolidates the coder-init boilerplate so subclasses
+│                   # just override `buildContent(_:)`
 └── Utilities/      # Extensions (L() helper, LanguageManager, .languageDidChange notif),
                     # Defaults (~60 preference keys), KeyBindingManager, UpdateChecker,
                     # Logging (dlog/wlog façade — see "Logging" pitfall below)
@@ -241,6 +244,21 @@ The first release was `v1.0` at https://github.com/zhaomin1995/awesome_player/re
 - **DV temp .mp4 cleanup** — `PlayerViewController` tracks `dvRemuxOutputURL` and deletes the prior one on each `openFile`; `purgeOrphanedDVRemuxFiles` runs at viewDidLoad to sweep up files left behind by a previous crashed run. Naming convention is `<UUID>_full.mp4` in `temporaryDirectory` — match the suffix exactly
 - **Cast source URL** — Chromecast/AirPlay handlers must read `vc.playbackSourceURL`, NOT `vc.currentFileURL` or `currentItem.asset as? AVURLAsset`. For DV files the engine is decoding the remuxed `.mp4`, but the source URL is still the original `.mkv` the receiver can't decode
 - **Chapter navigation** — use `ChapterNavigation.nextChapterIndex` / `previousChapterIndex`, NOT inline `firstIndex(where:)` against `currentTime ± tolerance`. The old tolerance approach silently skipped chapters less than 1-2s apart. The helper uses the "containing chapter" definition (chapter whose [start, nextStart) range covers the time) and is unit-tested
+- **i18n parity discipline** — any new `L("...")` call requires a corresponding key in `App/Localizable.xcstrings` with all 10 non-English translations. Run `Scripts/check-i18n.py` or `grep -rho 'L("[^"]\+")' "Awesome Player/" | sort -u` and diff against the catalog to catch regressions. Otherwise non-English users see English in the new dialogs. The Python script `/tmp/update_xcstrings.py` (in the prior hardening session) shows the JSON shape for bulk insert
+- **`Defaults` keys must register a default value** in `Defaults.registerDefaults()` even when the consuming code already has a fallback (e.g. `customShortcuts` with `Data()`). Audit with `comm -23 <(declared) <(registered)` — every declared key should have a registered value
+- **Bundle version source of truth** is pbxproj's `MARKETING_VERSION` (CFBundleShortVersionString) + `CURRENT_PROJECT_VERSION` (CFBundleVersion). Info.plist uses `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)` placeholders — don't hardcode literal strings there, the two will drift silently
+- **`UserDefaults.synchronize()`** — deprecated since macOS 10.12, no-op since 10.15. Don't add new calls; the framework auto-flushes on suspend/terminate
+- **SeekSliderView thumbnail jobs** — when `currentAsset` changes, `cancelAllCGImageGeneration()` MUST run before `imageGenerator = nil` and before `thumbnailCache.removeAllObjects()`. Otherwise a job submitted against the old asset can complete and write into the new asset's NSCache slot, showing a stale thumb for one tooltip cycle
+- **Logging** — never use raw `print()` in production code. `dlog(.category, msg)` is a no-op in Release; `wlog(.category, msg)` always emits via `os_log` for genuinely-anomalous events. `castLog` is just `dlog(.cast, message)` now — earlier versions wrote to `/tmp/chromecast_debug.log`, which leaked stream URLs and wasn't picked up by Console.app
+- **OpenSubtitlesService is async/await** — all four network methods (`search`, `download`, `ensureLoggedIn`, `requestDownloadLink`, `downloadFile`) return `async throws`. Callers use `Task { try await OpenSubtitlesService.search(...) }` and hop to `MainActor.run` for UI updates. Don't add new completion-handler wrappers; UpdateChecker uses the same pattern
+- **Casting refactor** — `ChromecastManager` (572 → ~360 lines) is now the discovery + media-control facade. `CastV2Connection.swift` owns the wire protocol: `CastV2Message` (protobuf encoder) + `NWConnectionWrapper` (TLS socket via CFStream — NWConnection/URLSessionStreamTask both fail against Chromecast's self-signed cert). `CastingHTTPClient.sendAVTransportAction` dedupes the SOAP-over-HTTP POST that both DLNAManager and AirPlayCastManager need
+- **`BasePrefsView`** — preference panes inherit from `BasePrefsView` and override `buildContent(_ stack:)` instead of `init(frame:)`. This eliminates 9 identical `required init?(coder:) { fatalError() }` boilerplate sites. `InputPrefsView` doesn't use the base because it also conforms to NSTableView delegate protocols and keeps init-time table setup co-located with its properties
+- **Floating panels refresh on language change** — `MediaInspectorController` + `VideoEQPanelController` each observe `.languageDidChange` and rebuild their labels in place. `ConvertStreamWindowController` does the same via a `refreshLocalizedText` method that re-sets section box / button titles. Earlier code only refreshed on next open, leaving visible windows stale. Same pattern: hold weak refs to the views, observe the notification, re-set titles
+- **ATS hardening — `NSAllowsArbitraryLoads` is OFF.** Control-plane traffic (UpdateChecker, OpenSubtitlesService) is HTTPS-enforced. AVPlayer can use cleartext for user-pasted media URLs because `NSAllowsArbitraryLoadsInMedia` is ON. Cast HTTP serve works via `NSAllowsLocalNetworking`. Don't re-enable the global toggle — allowlist specific hosts via `NSExceptionDomains` instead
+- **Test target** — wired in pbxproj (T00002, build phases S00002/FB0002/R00002, configs BC0030/BC0031). Shared scheme at `xcshareddata/xcschemes/Awesome Player.xcscheme` so `xcodebuild test` finds it. Two known issues:
+  1. On **Xcode 26 + macOS 26 the local `xcodebuild test` CLI fails to launch the test bundle** with `LaunchServices error -54` ("sandbox profile of this process is missing (allow lsopen)"). This is a system-level xcodebuild sandboxing issue, NOT a project problem — tests run fine from Xcode UI (Cmd+U) and on CI's macos-15 runner. Workaround for local CLI: run from Xcode.
+  2. `ENABLE_HARDENED_RUNTIME = NO` is set on the test target so the test bundle can inject into the (hardened) host app — Xcode's xctest injection requires the test bundle itself to be unrestricted
+- **Architecture pin: `ARCHS = arm64` in Release** — Vendor/ffmpeg + Vendor/libvlc dylibs are arm64-only. Xcode 26's "Standard Architectures" began including x86_64 again, silently breaking Release builds with `symbol(s) not found for architecture x86_64`. Don't drop the pin unless the vendor binaries gain a fat slice
 
 ### Casting Dolby Vision (currently unsupported — see findings)
 

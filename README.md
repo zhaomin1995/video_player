@@ -123,7 +123,7 @@ A full-featured macOS video player that combines **Dolby Vision** playback with 
 ## Requirements
 
 - macOS 14.0 or later
-- Apple Silicon or Intel Mac
+- Apple Silicon (M-series) — Intel Macs not supported (bundled libvlc/FFmpeg are arm64-only)
 
 ## Download (prebuilt)
 
@@ -164,6 +164,8 @@ sudo ditto "$RELEASE_APP" "/Applications/Awesome Player.app"
 ```
 
 **No external dependencies needed** — FFmpeg, libvlc, and yt-dlp are all bundled in the repo (under `Vendor/`). A build phase script automatically copies all dylibs, plugins, and the yt-dlp distribution into the app bundle. See CLAUDE.md for full build + distribution instructions.
+
+> **Apple Silicon only.** The bundled libvlc/FFmpeg dylibs are arm64-only. Release builds pin `ARCHS = arm64`. macOS 14+ on M-series Macs is the supported target.
 
 ## Architecture
 
