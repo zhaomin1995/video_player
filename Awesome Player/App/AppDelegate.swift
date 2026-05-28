@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowController: PlayerWindowController?
     private var preferencesController: PreferencesWindowController?
+    private var miniPlayer: MiniPlayerWindowController?
     let castingManager = CastingManager()
     let nowPlayingController = NowPlayingController()
 
@@ -137,6 +138,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// Handles `awesomeplayer://<encoded-url-or-path>` invocations from the
+    /// bookmarklet, browser extensions, scripts, or anything else that fires
+    /// a URL. Strips the awesomeplayer:// prefix and treats the remainder as
+    /// either an http(s) media URL (route through URLOpenCoordinator's
+    /// stream-resolution path) or a file path (open directly).
+    ///
+    /// Registered via the `CFBundleURLTypes` entry in Info.plist — macOS
+    /// routes matching schemes here via this AppKit callback automatically.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            if url.scheme == "awesomeplayer" {
+                // The body lives in absoluteString after the scheme; strip it
+                // and unescape so embedded ?query strings come through intact.
+                let stripped = String(url.absoluteString.dropFirst("awesomeplayer://".count))
+                guard let decoded = stripped.removingPercentEncoding else { continue }
+                routeIncomingURL(decoded)
+            } else if url.isFileURL {
+                windowController?.openFile(url: url)
+            }
+        }
+    }
+
+    private func routeIncomingURL(_ string: String) {
+        // file:// prefix → unwrap to a local URL; bare path → file URL;
+        // http(s):// → media URL routed through openStreamURL.
+        if string.hasPrefix("file://"), let url = URL(string: string) {
+            windowController?.openFile(url: url)
+        } else if string.hasPrefix("http://") || string.hasPrefix("https://"),
+                  let url = URL(string: string) {
+            // Reuse the URL-open coordinator's resolution logic (yt-dlp for
+            // YouTube etc., direct play for media URLs). Pass the URL in
+            // pre-resolved so the dialog doesn't prompt the user.
+            URLOpenCoordinator(windowController: windowController).openExternalURL(url)
+        } else if FileManager.default.fileExists(atPath: string) {
+            windowController?.openFile(url: URL(fileURLWithPath: string))
+        }
+    }
+
+    /// macOS Services entry point. Configured in Info.plist's NSServices.
+    /// User selects a URL or file path in any app, right-clicks → Services →
+    /// "Play in Awesome Player". The pasteboard hands us the URL/text/file
+    /// reference; we pipe it through the same routing as the URL-scheme path.
+    @objc func handleServicesURL(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString>) {
+        if let urls = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
+            for url in urls {
+                if url.isFileURL { windowController?.openFile(url: url) }
+                else { routeIncomingURL(url.absoluteString) }
+            }
+        } else if let strings = pboard.readObjects(forClasses: [NSString.self], options: nil) as? [String] {
+            for s in strings { routeIncomingURL(s) }
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
         if let filename = filenames.first {
             let url = URL(fileURLWithPath: filename)
@@ -245,6 +300,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func stepFrameBackward(_ sender: Any?) {
         windowController?.playerViewController.stepFrame(forward: false)
     }
+    /// Toggle between main window and the compact mini player. Engine stays
+    /// alive across the swap — both windows hold weak refs to the same
+    /// PlayerViewController via different paths (main: direct child; mini:
+    /// captured at init). Window-close routes back through here so the user
+    /// always ends up with a visible window.
+    @objc func beginInteractiveCrop(_ sender: Any?) {
+        windowController?.playerViewController.beginInteractiveCrop()
+    }
+
+    @objc func showVideoFilters(_ sender: Any?) {
+        VideoFiltersPanelController.shared.showWindow(nil)
+        VideoFiltersPanelController.shared.window?.makeKeyAndOrderFront(nil)
+    }
+
+    @objc func toggleMiniPlayer(_ sender: Any?) {
+        guard let vc = windowController?.playerViewController else { return }
+        if let mini = miniPlayer, mini.window?.isVisible == true {
+            mini.window?.orderOut(nil)
+            windowController?.window?.makeKeyAndOrderFront(nil)
+        } else {
+            if miniPlayer == nil {
+                miniPlayer = MiniPlayerWindowController(playerVC: vc)
+            }
+            windowController?.window?.orderOut(nil)
+            miniPlayer?.showWindow(nil)
+            miniPlayer?.window?.makeKeyAndOrderFront(nil)
+        }
+    }
+
     @objc func setSleepTimer(_ sender: Any?) {
         guard let item = sender as? NSMenuItem else { return }
         let timer = SleepTimer.shared

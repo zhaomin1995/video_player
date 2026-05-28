@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Awesome Player — Browser Bookmarklet</title>
+    <style>
+        body { font: 15px/1.5 -apple-system, system-ui, sans-serif;
+               max-width: 680px; margin: 40px auto; padding: 0 20px; color: #222; }
+        h1 { font-size: 22px; }
+        a.bookmarklet {
+            display: inline-block; padding: 10px 18px;
+            background: #007AFF; color: white; text-decoration: none;
+            border-radius: 8px; font-weight: 600;
+        }
+        a.bookmarklet:hover { background: #0066D6; }
+        pre { background: #f5f5f7; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
+        ol li { margin-bottom: 8px; }
+        code { background: #f0f0f3; padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <h1>Awesome Player — Browser Bookmarklet</h1>
+    <p>Drag this button into your browser's bookmarks bar:</p>
+
+    <p>
+        <a class="bookmarklet" href="javascript:(function(){
+            var url = window.location.href;
+            // Prefer the most-specific media element if any visible <video> is on the page
+            var v = document.querySelector('video');
+            if (v && v.currentSrc) url = v.currentSrc;
+            var src = document.querySelector('source[src]');
+            if (src && !v) url = src.src;
+            window.location.href = 'awesomeplayer://' + encodeURIComponent(url);
+        })();">Play in Awesome Player</a>
+    </p>
+
+    <h2>How it works</h2>
+    <ol>
+        <li>Drag the button above into your bookmarks bar.</li>
+        <li>Visit any page with a video (YouTube, Vimeo, an MP4 link, a Plex web page, etc.).</li>
+        <li>Click the bookmark. The browser fires <code>awesomeplayer://&lt;page-url&gt;</code>, which macOS routes to the app.</li>
+        <li>The app extracts the page URL, runs it through yt-dlp if it's not a direct media link, and starts playback.</li>
+    </ol>
+
+    <h2>Works in</h2>
+    <ul>
+        <li>Safari, Chrome, Firefox, Edge — anything with a bookmark bar that runs JavaScript.</li>
+        <li>For Safari, you may need to confirm the first launch (System Settings &rarr; Privacy &amp; Security).</li>
+    </ul>
+
+    <h2>If the page hosts the video directly (e.g. an MP4 in a tab)</h2>
+    <p>The bookmarklet prefers the visible <code>&lt;video&gt;</code> element's currentSrc over the page URL,
+       so it'll grab the actual stream URL when there is one — useful for sites that hide the
+       direct URL behind a player iframe.</p>
+
+    <h2>Alternative: Services menu</h2>
+    <p>Select any video URL anywhere in macOS (Safari address bar, Notes, Mail), right-click,
+       and choose <strong>Services &rarr; Play in Awesome Player</strong>. No bookmarklet needed.
+       After installing the app, run <code>/System/Library/CoreServices/pbs -update</code> in
+       Terminal to refresh the Services registry if the menu item doesn't appear right away.</p>
+
+    <h2>Source code</h2>
+    <pre>javascript:(function(){
+  var url = window.location.href;
+  var v = document.querySelector('video');
+  if (v &amp;&amp; v.currentSrc) url = v.currentSrc;
+  var src = document.querySelector('source[src]');
+  if (src &amp;&amp; !v) url = src.src;
+  window.location.href = 'awesomeplayer://' + encodeURIComponent(url);
+})();</pre>
+</body>
+</html>

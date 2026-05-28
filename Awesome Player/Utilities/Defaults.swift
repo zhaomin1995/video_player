@@ -82,6 +82,19 @@ enum Defaults {
     static let fullscreenControlBar = "fullscreen.controlBarBehavior"
     static let timeOSDPosition = "fullscreen.timeOSDPosition"
 
+    // MARK: - Video Filters (libvlc chain)
+    static let filterSharpen = "filter.sharpen"
+    static let filterSharpenSigma = "filter.sharpenSigma"
+    static let filterGrain = "filter.grain"
+    static let filterGrainVariance = "filter.grainVariance"
+    static let filterPosterize = "filter.posterize"
+    static let filterInvert = "filter.invert"
+    static let filterMirror = "filter.mirror"
+
+    // MARK: - System Awake
+    static let preventSleepWhilePlaying = "system.preventSleep"
+    static let allowScreenSaverForAudio = "system.allowScreenSaverForAudio"
+
     // MARK: - Keyboard
     static let mediaKeyEnabled = "keyboard.mediaKeyEnabled"
     static let escapeKeyBehavior = "keyboard.escapeKeyBehavior"
@@ -172,6 +185,15 @@ enum Defaults {
             blackOutOtherScreens: false,
             fullscreenControlBar: 0,     // 0=Auto-hide 3s, 1=Auto-hide 5s, 2=Always
             timeOSDPosition: 0,          // 0=Top-left, 1=Top-center, 2=Top-right, 3=Hidden
+            filterSharpen: false,
+            filterSharpenSigma: 0.5,
+            filterGrain: false,
+            filterGrainVariance: 1.0,
+            filterPosterize: false,
+            filterInvert: false,
+            filterMirror: false,
+            preventSleepWhilePlaying: true,
+            allowScreenSaverForAudio: true,
             mediaKeyEnabled: true,
             escapeKeyBehavior: 0,        // 0=Exit Fullscreen, 1=Close Panel, 2=Stop Playback
             singleClickAction: 0,        // 0=Play/Pause, 1=Nothing

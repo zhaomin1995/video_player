@@ -18,6 +18,19 @@ final class URLOpenCoordinator {
         self.windowController = windowController
     }
 
+    /// Open a URL passed in from an external source (URL scheme, Services
+    /// menu, bookmarklet). Skips the input dialog; otherwise routes through
+    /// the same direct-media-URL / yt-dlp resolution logic as `begin()`.
+    func openExternalURL(_ url: URL) {
+        NSApp.activate(ignoringOtherApps: true)
+        let urlString = url.absoluteString
+        if isDirectMediaURL(urlString) {
+            windowController?.openFile(url: url)
+        } else {
+            resolveWithYTDLP(urlString)
+        }
+    }
+
     func begin() {
         let alert = NSAlert()
         alert.messageText = L("Open URL")

@@ -24,6 +24,9 @@ A full-featured macOS video player that combines **Dolby Vision** playback with 
 - **Playback speed control with pitch correction** (0.25x-4x) — voices stay natural at 1.5×/2× via `AVAudioTimePitchAlgorithm.spectral` on the AVPlayer path and libvlc's `audio-time-stretch` on the VLC path
 - Frame-by-frame stepping forward (`.`) and backward (`,`) — AVPlayer uses native `step(byCount:)`; libvlc path approximates backward via a 40ms precise-seek (libvlc 3.x has no `previous_frame` API)
 - **Sleep timer** (Playback → Sleep Timer) with 15/30/45/60/90-minute presets, "End of File" mode, and a live countdown rendered into the menu
+- **Sleep prevention** — `ProcessInfo.beginActivity` keeps the display awake during video playback and the system awake during audio-only playback (configurable)
+- **Music Mode** (Window → Music Mode, ⌘⇧M) — compact 380×120 floating panel with title, time, scrubber, and play controls. Main window hides while engine keeps playing
+- **Video filters panel** (Video → Filters → Video Filters…) — toggle sharpen / film grain / posterize / invert / mirror with intensity sliders; saved to defaults; reopens current file to apply
 - Configurable seek intervals (short and long seek with arrow keys)
 - Playback resume with smart thresholds (remembers position per file; requires 3min+ duration, 5-95% position, 1min absolute minimum)
 - **yt-dlp integration** for YouTube and web URL playback — bundled self-contained binary (no install needed), resolution picker dialog with all available qualities (up to 4K/8K), high-res playback via VLC with separate video+audio stream merging
@@ -40,6 +43,7 @@ A full-featured macOS video player that combines **Dolby Vision** playback with 
 - **Video brightness/contrast/saturation/hue/gamma adjustments** (Video Equalizer floating panel with sliders and reset)
 - **Deinterlace modes** (Off, Blend, Bob, Linear, Yadif) via libvlc
 - **Crop presets** (Default, 16:9, 4:3, 16:10, 1.85:1, 2.35:1) via libvlc crop geometry
+- **Interactive crop** (Video → Crop → Custom Crop…) — drag-to-select an arbitrary rectangle directly on the video; coordinates are mapped to source-pixel space respecting letterbox/pillarbox
 - Extended volume support (>100% via VLC engine)
 - Aspect ratio presets (Default, 4:3, 16:9, 16:10, 2.35:1, 2.39:1)
 - Video rotation (left/right) and flip (horizontal/vertical) with revert
@@ -112,6 +116,9 @@ A full-featured macOS video player that combines **Dolby Vision** playback with 
 
 ### System Integration
 - **Now Playing / Control Center** integration (MPRemoteCommandCenter — play, pause, skip, seek, scrub)
+- **`awesomeplayer` CLI** — install via `./Scripts/install-cli.sh` (symlinks into `/usr/local/bin`). Then `awesomeplayer ~/Movies/foo.mkv` or `awesomeplayer https://…` opens the file in the running app
+- **Browser bookmarklet** (`Scripts/safari-bookmarklet.html`) — drag the "Play in Awesome Player" button to your bookmarks bar; click on any video page to fire the URL into the app via the `awesomeplayer://` URL scheme. Works in Safari, Chrome, Firefox
+- **Services menu** — right-click any URL or file in Finder/Safari/Mail → Services → **Play in Awesome Player**
 - **Media key handling** (play/pause/next/prev from keyboard media keys, configurable)
 - Open files from Finder (`application(_:openFile:)` and `application(_:openFiles:)`)
 - **Screenshot capture** (PNG/JPEG/TIFF format, save to Desktop/Pictures/Downloads/Custom path)

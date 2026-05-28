@@ -67,6 +67,10 @@
 		A10091 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10091 /* UpdateChecker.swift */; };
 		A10092 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10092 /* Logging.swift */; };
 		A10093 /* SleepTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10093 /* SleepTimer.swift */; };
+		A10094 /* SleepPreventer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10094 /* SleepPreventer.swift */; };
+		A10120 /* MiniPlayerWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10120 /* MiniPlayerWindowController.swift */; };
+		A10121 /* CropOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10121 /* CropOverlayView.swift */; };
+		A10122 /* VideoFiltersPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10122 /* VideoFiltersPanelController.swift */; };
 		A10400 /* AirPlayMenuDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10400 /* AirPlayMenuDelegate.swift */; };
 		A10401 /* ChromecastMenuDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10401 /* ChromecastMenuDelegate.swift */; };
 		A10402 /* TrackMenuDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10402 /* TrackMenuDelegate.swift */; };
@@ -140,6 +144,10 @@
 		F10091 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F10092 /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 		F10093 /* SleepTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTimer.swift; sourceTree = "<group>"; };
+		F10094 /* SleepPreventer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepPreventer.swift; sourceTree = "<group>"; };
+		F10120 /* MiniPlayerWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerWindowController.swift; sourceTree = "<group>"; };
+		F10121 /* CropOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropOverlayView.swift; sourceTree = "<group>"; };
+		F10122 /* VideoFiltersPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFiltersPanelController.swift; sourceTree = "<group>"; };
 		F10400 /* AirPlayMenuDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayMenuDelegate.swift; sourceTree = "<group>"; };
 		F10401 /* ChromecastMenuDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromecastMenuDelegate.swift; sourceTree = "<group>"; };
 		F10402 /* TrackMenuDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackMenuDelegate.swift; sourceTree = "<group>"; };
@@ -287,6 +295,7 @@
 				F10029 /* PlayerWindow.swift */,
 				F10030 /* PlayerWindowController.swift */,
 				F10031 /* TitleBarView.swift */,
+				F10120 /* MiniPlayerWindowController.swift */,
 			);
 			path = Window;
 			sourceTree = "<group>";
@@ -299,6 +308,8 @@
 				F10027 /* SubtitleOverlayView.swift */,
 				F10028 /* VideoView.swift */,
 				F10070 /* WelcomeView.swift */,
+				F10121 /* CropOverlayView.swift */,
+				F10122 /* VideoFiltersPanelController.swift */,
 				F10311 /* OpenSubtitlesSearchWindow.swift */,
 				D6342BFA0000000000000001 /* PlaylistPanelView.swift */,
 				F10081 /* VideoEQPanelController.swift */,
@@ -382,6 +393,7 @@
 				F10091 /* UpdateChecker.swift */,
 				F10092 /* Logging.swift */,
 				F10093 /* SleepTimer.swift */,
+				F10094 /* SleepPreventer.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -607,6 +619,10 @@
 				A10091 /* UpdateChecker.swift in Sources */,
 				A10092 /* Logging.swift in Sources */,
 				A10093 /* SleepTimer.swift in Sources */,
+				A10094 /* SleepPreventer.swift in Sources */,
+				A10120 /* MiniPlayerWindowController.swift in Sources */,
+				A10121 /* CropOverlayView.swift in Sources */,
+				A10122 /* VideoFiltersPanelController.swift in Sources */,
 				A10310 /* OpenSubtitlesService.swift in Sources */,
 				A10311 /* OpenSubtitlesSearchWindow.swift in Sources */,
 			);

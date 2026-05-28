@@ -196,6 +196,15 @@ class VLCPlayerEngine {
             // (which we set `audioTimePitchAlgorithm = .spectral` on).
             libvlc_media_add_option(m, ":audio-time-stretch")
 
+            // Video filter chain — see VideoFiltersPanelController.
+            // libvlc 3.x can't add/remove video filters at runtime; the chain
+            // is fixed at media-creation time. So a user enabling a filter
+            // has no effect until the next openFile, which the panel surfaces
+            // via its "Reopen Current File" button.
+            if let chain = VideoFiltersPanelController.buildFilterChainOption() {
+                libvlc_media_add_option(m, ":video-filter=\(chain)")
+            }
+
             // Video decode mode (preference: 0=Auto, 1=Force HW, 2=Force SW)
             // Default leaves libvlc to pick (it auto-prefers VideoToolbox on macOS).
             // Force HW makes any decoder fall back to error rather than software —

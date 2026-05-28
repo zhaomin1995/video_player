@@ -1141,6 +1141,43 @@ class PlayerViewController: NSViewController {
         }
     }
 
+    // MARK: - Interactive Crop
+
+    private var cropOverlay: CropOverlayView?
+
+    /// Enter drag-to-select crop mode. The overlay is added on top of every
+    /// other layer (so it's above subtitles, control bar, etc.) and captures
+    /// mouse + key events. Apply pushes the result into the active engine;
+    /// Cancel/Reset tears the overlay down without changing crop state.
+    func beginInteractiveCrop() {
+        guard cropOverlay == nil else { return }
+        let overlay = CropOverlayView(frame: view.bounds)
+        overlay.autoresizingMask = [.width, .height]
+        overlay.videoSize = { [weak self] in
+            self?.playerEngine?.videoSize ?? self?.vlcEngine?.videoSize
+        }
+        overlay.onApply = { [weak self] geom in
+            guard let self = self else { return }
+            if let g = geom {
+                if g.isEmpty {
+                    // Reset path: clear active crop
+                    self.vlcEngine?.setCropGeometry(nil)
+                    self.osdView.show(message: L("Crop cleared"))
+                } else {
+                    self.vlcEngine?.setCropGeometry(g)
+                    self.osdView.show(message: String(format: L("Crop: %@"), g))
+                }
+            }
+            self.cropOverlay?.removeFromSuperview()
+            self.cropOverlay = nil
+            self.view.window?.makeFirstResponder(self.view)
+        }
+        view.addSubview(overlay)
+        view.window?.makeFirstResponder(overlay)
+        cropOverlay = overlay
+        osdView.show(message: L("Drag to select crop area"), duration: 3)
+    }
+
     // MARK: - Sleep Timer
 
     /// Called by SleepTimer.onFire when the duration timer expires or the
@@ -1453,6 +1490,23 @@ extension PlayerViewController: AVPlayerEngineDelegate {
         controlBarView.setPlaying(isPlaying)
         onPlaybackStateChanged?(isPlaying)
         (NSApp.delegate as? AppDelegate)?.nowPlayingController.updatePlaybackState(isPlaying: isPlaying)
+        updateSleepAssertion(isPlaying: isPlaying)
+    }
+
+    /// Engage/release the IOKit sleep assertion based on play state. Reads
+    /// `Defaults.preventSleepWhilePlaying` lazily so the pref can be toggled
+    /// without restarting playback. `hasVideo` is true when the active engine
+    /// reports a non-zero video size — audio-only files (mp3, flac, m4a) flip
+    /// it false so the display is allowed to sleep per the pref.
+    private func updateSleepAssertion(isPlaying: Bool) {
+        let enabled = UserDefaults.standard.bool(forKey: Defaults.preventSleepWhilePlaying)
+        guard enabled, isPlaying else {
+            SleepPreventer.shared.release()
+            return
+        }
+        let size = playerEngine?.videoSize ?? vlcEngine?.videoSize
+        let hasVideo = (size?.width ?? 0) > 0 && (size?.height ?? 0) > 0
+        SleepPreventer.shared.engage(hasVideo: hasVideo)
     }
 
     func playerEngineExternalPlaybackChanged(isActive: Bool) {
@@ -1542,6 +1596,7 @@ extension PlayerViewController: VLCPlayerEngineDelegate {
         controlBarView.setPlaying(isPlaying)
         onPlaybackStateChanged?(isPlaying)
         (NSApp.delegate as? AppDelegate)?.nowPlayingController.updatePlaybackState(isPlaying: isPlaying)
+        updateSleepAssertion(isPlaying: isPlaying)
     }
 }
 

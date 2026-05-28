@@ -721,6 +721,10 @@ class MenuManager {
             let title = crop == "Default" ? L("Default") : crop
             cropMenu.addItem(withTitle: title, action: #selector(AppDelegate.setCrop(_:)), keyEquivalent: "")
         }
+        cropMenu.addItem(.separator())
+        cropMenu.addItem(withTitle: L("Custom Crop…"),
+                         action: #selector(AppDelegate.beginInteractiveCrop(_:)),
+                         keyEquivalent: "")
         cropItem.submenu = cropMenu
         menu.addItem(cropItem)
         menu.addItem(.separator())
@@ -729,6 +733,7 @@ class MenuManager {
         let filtersItem = NSMenuItem(title: L("Filters"), action: nil, keyEquivalent: "")
         let filtersMenu = NSMenu(title: L("Filters"))
         filtersMenu.addItem(withTitle: L("Video Equalizer…"), action: #selector(AppDelegate.showVideoEQ(_:)), keyEquivalent: "e")
+        filtersMenu.addItem(withTitle: L("Video Filters…"), action: #selector(AppDelegate.showVideoFilters(_:)), keyEquivalent: "")
 
         // Deinterlace submenu inside Filters
         let deinterlaceItem = NSMenuItem(title: L("Deinterlace"), action: nil, keyEquivalent: "")
@@ -909,6 +914,9 @@ class MenuManager {
         menu.addItem(withTitle: L("Zoom"), action: #selector(AppDelegate.zoomAction(_:)), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: L("Keep on Top"), action: #selector(AppDelegate.toggleAlwaysOnTop(_:)), keyEquivalent: "t")
+        let miniItem = menu.addItem(withTitle: L("Music Mode"),
+            action: #selector(AppDelegate.toggleMiniPlayer(_:)), keyEquivalent: "m")
+        miniItem.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(.separator())
         menu.addItem(withTitle: L("Media Inspector"), action: #selector(AppDelegate.showInspector(_:)), keyEquivalent: "i")
 

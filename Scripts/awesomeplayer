@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+#
+# awesomeplayer — open files or URLs in Awesome Player from the command line.
+#
+# Usage:
+#   awesomeplayer ~/Movies/foo.mkv
+#   awesomeplayer https://www.youtube.com/watch?v=...
+#   awesomeplayer file1.mp4 file2.mkv     # opens both
+#   awesomeplayer                         # opens to the welcome view
+#
+# Install: run Scripts/install-cli.sh once. That symlinks this script into
+# /usr/local/bin (or ~/bin if you prefer; pass --prefix).
+#
+# Why a shell wrapper instead of a Swift CLI target like IINA's: a target adds
+# build/sign complexity and a separate binary inside the .app. `open -a` is
+# what we'd shell out to anyway — this just gives it a friendlier name and
+# handles the "no args = launch app" case.
+
+set -e
+
+APP_NAME="Awesome Player"
+
+# Resolve full path for each arg so `open -a` interprets relative paths
+# correctly. Pass URLs through unchanged.
+args=()
+for a in "$@"; do
+    case "$a" in
+        http://*|https://*|file://*|awesomeplayer://*)
+            args+=("$a")
+            ;;
+        *)
+            if [ -e "$a" ]; then
+                # Use python for absolute path resolution — `realpath` isn't
+                # on macOS by default, and `cd $(dirname …); pwd` choke on
+                # paths with spaces.
+                abs=$(/usr/bin/python3 -c "import os, sys; print(os.path.abspath(sys.argv[1]))" "$a")
+                args+=("$abs")
+            else
+                # Non-existent path — let `open` complain rather than guess
+                args+=("$a")
+            fi
+            ;;
+    esac
+done
+
+if [ ${#args[@]} -eq 0 ]; then
+    exec open -a "$APP_NAME"
+else
+    exec open -a "$APP_NAME" "${args[@]}"
+fi
