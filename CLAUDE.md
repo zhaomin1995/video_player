@@ -14,25 +14,29 @@ A full-featured macOS video player combining Dolby Vision playback with AirPlay 
 ### Directory Structure
 ```
 Awesome Player/
-├── App/            # AppDelegate, main.swift, Info.plist, AppIcon
-├── Player/         # AVPlayerEngine, VLCPlayerEngine, ABLoopController,
+├── App/            # AppDelegate, main.swift, Info.plist, AppIcon,
+│                   # Localizable.xcstrings (Xcode 15 single-file i18n catalog, 11 locales)
+├── Player/         # AVPlayerEngine, VLCPlayerEngine (+AudioEqualizerPreset), ABLoopController,
 │                   # NowPlayingController, ResumeManager
-├── Audio/          # AudioEqualizer (presets), AudioPassthrough, AudioPassthroughManager
+├── Audio/          # AudioPassthrough, AudioPassthroughManager
 ├── Casting/        # CastingManager, ChromecastManager (Cast V2), DLNAManager, CastingHTTPServer
 ├── Media/          # MediaInfo, SubtitleParser/Manager, PlaylistManager
 ├── FFmpeg/         # FFmpegBridge (Obj-C prober/remuxer/subtitle extractor), bridging header
 ├── UI/
 │   ├── Window/     # PlayerWindow (borderless), PlayerWindowController, TitleBarView (badges)
 │   ├── Player/     # PlayerViewController, VideoView, SubtitleOverlayView, WelcomeView,
-│   │               # PlaylistPanelView, VideoEQPanelController, MediaInspectorController
+│   │               # PlaylistPanelView, VideoEQPanelController, MediaInspectorController,
+│   │               # ConvertStreamWindowController (+SystemUsageSampler)
 │   ├── Controls/   # ControlBarView, SeekSliderView, VolumeSliderView, PlaybackButtons,
 │   │               # SpeedButton, CastButton
 │   ├── OSD/        # OSDView (on-screen display messages)
-│   ├── Menu/       # MenuManager (all menus including Edit with Cut/Copy/Paste),
+│   ├── Menu/       # MenuManager (all menus + PlaybackSpeedSliderView, SubtitleOpacitySliderView,
+│   │               # PlaybackMenuDelegate, SubtitleMenuDelegate, EditMenuDelegate),
 │   │               # AudioDeviceMenuDelegate, AirPlayMenuDelegate, ChromecastMenuDelegate,
 │   │               # RecentDocumentsMenuDelegate, TrackMenuDelegate (audio/video/subtitle)
-│   └── Preferences/# PreferencesWindowController (9-tab with animated resizing)
-└── Utilities/      # Extensions, Defaults (90+ preference keys across 9 categories)
+│   └── Preferences/# PreferencesWindowController (9-tab, live language switch, LanguagePicker)
+└── Utilities/      # Extensions (L() helper, LanguageManager, .languageDidChange notif),
+                    # Defaults (90+ preference keys across 9 categories)
 Vendor/
 ├── ffmpeg/         # Bundled FFmpeg headers + dylibs
 ├── libvlc/         # Bundled libvlc headers, dylibs, plugins, libvlc_compat.h
@@ -77,6 +81,17 @@ Vendor/
 - `libvlc_media_new_location()` used for network URLs (vs `libvlc_media_new_path()` for local files)
 - HTTP(S) URLs without file extensions (e.g., googlevideo.com `/videoplayback`) route to AVPlayer via `isNativeAVPlayerFormat`
 - Process pipe reads use separate threads to avoid deadlock when yt-dlp writes large output
+- i18n via Xcode 15 single-file `Localizable.xcstrings` catalog at `App/`. 11 locales: en (source) + zh-Hans / zh-Hant / yue (Cantonese) / ja / ko / es / fr / de / pt-BR / ru. All user-facing strings wrapped in `L("…")` helper from `Extensions.swift`
+- `LanguageManager.shared` (in `Extensions.swift`) owns the active resource bundle and exposes `setLanguage(_:)` for runtime switching. `L()` routes through it instead of calling `NSLocalizedString` directly
+- In-app language picker in General preferences uses `LanguagePicker` action handler — flips the menu bar + Preferences window + future dialogs **without relaunching**. Writes `AppleLanguages` UserDefaults key too so the choice persists across launches and affects system dialogs at next launch
+- `EditMenuDelegate` strips the three items AppKit auto-injects into any menu containing `cut:/copy:/paste:` (AutoFill submenu, Start Dictation, Emoji & Symbols) — none make sense for a video player's URL/timecode dialog text fields
+- AudioEqualizerPreset is a struct in `VLCPlayerEngine.swift` holding name + preamp + 10 ISO band amplifications. 23 Movist-style presets. EQ is built via `libvlc_audio_equalizer_new` + `libvlc_audio_equalizer_set_amp_at_index` (NOT libvlc's built-in `_new_from_preset` which only has 18 generic names)
+- Subtitle styling: 16 HTML/CSS named colors with swatch images in menus, outline thickness via NSAttributedString `strokeWidth` (negative = fill + stroke), background color/opacity via NSAttributedString `backgroundColor` with alpha. KVO observers on UserDefaults so changes apply live to currently-displayed subtitle
+- Playback Speed inline slider in Playback menu via `NSMenuItem.view` set to `PlaybackSpeedSliderView`. Log2 scale so 1.0× sits dead center between 0.25× and 4×
+- Subtitle Background Opacity inline slider via `SubtitleOpacitySliderView`, same NSMenuItem.view pattern
+- `PreferencesWindowController.TabDef` splits stable English `id` (used as NSTabViewItem + NSToolbarItem identifier) from localized `label` (shown to user). Toolbar identifiers MUST stay stable across locales or selection state breaks
+- `ConvertStreamWindowController` in `UI/Player/` — VLC's File → Convert/Stream… equivalent. Uses libvlc sout pipeline (`:sout=#transcode{...}:standard{access=file,...}`). 12 profiles matching VLC's built-in set. Reuses `VLCPlayerEngine.sharedInstance` (libvlc supports multiple concurrent media players on one instance). Stream output not implemented
+- `SystemUsageSampler` (bottom of `ConvertStreamWindowController.swift`) reports per-process CPU via `task_threads()` + `thread_info(THREAD_BASIC_INFO)` and system GPU via IORegistry `IOAccelerator` services reading `PerformanceStatistics["Device Utilization %"]`. Updated on the existing 500ms progress timer during conversion
 
 ## Development Guidelines
 
@@ -111,6 +126,22 @@ Vendor/
 - Window size is forced to 0.7x screen after showing to override macOS state restoration (`NSQuitAlwaysKeepsWindows` set to false)
 - `ENABLE_USER_SCRIPT_SANDBOXING` must be `NO` or build scripts can't access `Vendor/` directory
 - Bundled FFmpeg dylibs must use `@rpath` for inter-library deps, not absolute paths. If a freshly built/downloaded dylib has its install ID as `@rpath/...` but references siblings via an absolute build-machine path (visible in `otool -L`), the app will crash at launch with `dyld: Library not loaded` on any other machine. Patch with `install_name_tool -change /abs/path/libfoo.X.dylib @rpath/libfoo.X.Y.Z.dylib <dylib>` for each bad dep, then `codesign --force --sign - <dylib>` to restore the ad-hoc signature. The build script only copies fully-versioned files (e.g. `libavcodec.61.19.101.dylib`), so the `@rpath` target must be the fully-versioned name, not the major-only soname
+- Xcode does NOT emit an `en.lproj/Localizable.strings` for the catalog's source language (`en` in our case). Trying to load `Bundle.main.path(forResource: "en", ofType: "lproj")` returns nil. `L()` must short-circuit and return the key directly when the active language is English — the keys ARE the English strings. Falling through to Bundle.main is wrong because…
+- …`Bundle.main.preferredLocalizations` is frozen at app launch (computed from `AppleLanguages` at first lookup). It does NOT re-evaluate after a runtime `AppleLanguages` mutation. Anything that reads `NSLocalizedString` directly against Bundle.main will return launch-time-language strings forever — even after the user changes language in our picker. Always go through `LanguageManager.shared.bundle` instead
+- CJK Forward/Backward direction translations are easy to invert (向前 = forward, 向後/向后 = backward). We caught a 5s seek shipping with the directions swapped via an LLM reviewer pre-ship. ALWAYS QA new translations with a native reviewer agent for any string mentioning direction, time, or sequence
+- AppKit auto-injects three items into any menu it detects as the "Edit menu" (i.e. any menu with `cut:`/`copy:`/`paste:` items): AutoFill submenu, Start Dictation, Emoji & Symbols. They appear AFTER our `setupMainMenu()` runs, so we can't just not add them. To suppress, attach an `NSMenuDelegate` (we use `EditMenuDelegate`) that strips items by selector name (`orderFrontCharacterPalette:`, `startDictation:`) on `menuNeedsUpdate` / `menuWillOpen`. AutoFill's parent has nil action — match by localized title substring across all supported locales
+- libvlc's `file-caching` default is **1000ms**. This was the root cause of the 1-second seek lag both we and VLC.app exhibited vs Movist Pro (which uses raw FFmpeg without libvlc's input-buffer layer). Set `:file-caching=100` as a media option — confirmed default value via `vlc-master/src/libvlc-module.c`
+- libvlc `:input-fast-seek` media option snaps seeks to nearest keyframe instead of decoding forward to exact-frame target. Trade ~1s seek accuracy for sub-100ms response. Use it for parity with AVPlayer keyframe seeks
+- AVPlayer's `automaticallyWaitsToMinimizeStalling` defaults to **true**. For local file playback this adds 100-300ms of perceived seek lag while AVPlayer refills its stall-protection buffer. Set it to `false` in `AVPlayerEngine.open()`. (Behavior was never observable in VLC.app or Movist Pro because they don't go through AVPlayer at all.)
+- `AVPlayer.seek(to:toleranceBefore:toleranceAfter:)` automatically cancels any pending seek when a new one arrives. The "wait for current seek to finish, then start the pending one" coalescing pattern is harmful — on slider drags it doubles perceived latency because the next seek doesn't start until the previous one VISUALLY settles. Just call `playerItem?.cancelPendingSeeks()` and fire-and-forget the new seek
+- Seek tolerance per call site: positive infinity (`.positiveInfinity`) for interactive seeks (slider scrub, arrow keys); 0.1s precise for programmatic exact-timestamp seeks (chapter nav, jump-to-time, resume from saved position)
+- `AVPlayerLayer.actions = ["bounds": NSNull(), "position": NSNull(), "frame": NSNull(), …]` prevents implicit CoreAnimation animations on those properties. Without this, the layer animates its bounds in parallel with `NSWindow.toggleFullScreen` — AVPlayer's render pipeline gets confused by the moving target and the video stalls for ~1-2s during the fullscreen transition. See `VideoView.setPlayer(_:)`
+- The MKV file-open `FFmpegBridge.probeFile()` call for Dolby Vision detection must run on a background queue (`.userInitiated`), NOT the main thread. `avformat_find_stream_info` reads packets and can block for 100-300ms on a 4K file. `PlayerViewController.openFile` runs this async + uses a `currentFileURL == url` guard to drop the result if the user opened a different file mid-probe
+- `THREAD_BASIC_INFO_COUNT` macro is NOT bridged to Swift. To call `thread_info()` with the basic-info flavor, compute the count manually: `mach_msg_type_number_t(MemoryLayout<thread_basic_info_data_t>.size / MemoryLayout<natural_t>.size)`
+- IOKit's `IOAccelerator` services expose `PerformanceStatistics["Device Utilization %"]` — fully public IOKit API for reading GPU utilization on both Intel and Apple Silicon Macs. This is what Activity Monitor's GPU History uses. Walk via `IOServiceMatching("IOAccelerator")` + `IOIteratorNext` and read with `IORegistryEntryCreateCFProperties`
+- Adding a new Swift file when not using Xcode requires manual edits to `project.pbxproj` at four spots: PBXBuildFile entry, PBXFileReference entry, group children list, and PBXSourcesBuildPhase / PBXResourcesBuildPhase files list. UUIDs in our project follow `A100XX` (build) and `F100XX` (file ref) pattern — pick unused IDs (e.g. `A10100`+) and reuse them in all four spots
+- macOS auto-adds Emoji & Symbols via `orderFrontCharacterPalette:` selector and Start Dictation via `startDictation:` selector. These are public AppKit selectors — match by name for robust cross-locale stripping
+- Floating panel controllers (`MediaInspectorController`, `VideoEQPanelController`) bake L() values at init time into NSTextField labels and have no live-refresh logic. On `.languageDidChange`, AppDelegate must nil them so the next open builds fresh views with new-locale strings. `PreferencesWindowController` is the exception — it observes the notification itself and rebuilds its tabs in place
 
 ### Casting Dolby Vision (currently unsupported — see findings)
 
@@ -217,6 +248,96 @@ transcode. Live streaming to this TV via DLNA is not possible.
 
 - A traced/stopped process (Xcode debugger attached) can't be terminated via `kill -9`. The `ps` `STAT` column shows `SX`. Users must quit Xcode or detach the debugger; shell-level kills do nothing.
 - `dovi_tool -m 2/3 convert` only rewrites RPU metadata to claim Profile 8.1; it doesn't transcode the IPT-PQ base layer pixels to BT.2020-PQ. AVPlayer/AppleTV don't apply the RPU's color transform when they see a P8.1 file, so the relabeled file plays with the same wrong colors as the original P5. The only working approach is full pixel transcode via libplacebo, which does apply the RPU per-frame.
+
+### Internationalization (i18n)
+
+**Format.** Single-file Xcode 15+ string catalog at `Awesome Player/App/Localizable.xcstrings`. Source language is English. Keys are the English strings themselves (not abstract identifiers like `menu.playPause`) — `L("Play / Pause")` is the standard call site. Xcode compiles the catalog into `<locale>.lproj/Localizable.strings` for each non-source locale at build time.
+
+**Supported locales (11):** `en` (source), `zh-Hans`, `zh-Hant`, `yue` (Cantonese), `ja`, `ko`, `es`, `fr`, `de`, `pt-BR`, `ru`. Listed in `Info.plist` under `CFBundleLocalizations` and in `project.pbxproj` under `knownRegions`.
+
+**L() helper.** From `Utilities/Extensions.swift`:
+```swift
+func L(_ key: String, comment: String = "") -> String {
+    if LanguageManager.shared.isEnglish { return key }
+    return LanguageManager.shared.bundle.localizedString(forKey: key, value: key, table: nil)
+}
+```
+The English short-circuit is essential — Xcode does NOT emit `en.lproj` for the source language, so a bundle lookup for "en" returns nil and the code would silently fall through to Bundle.main, which has its `preferredLocalizations` frozen at app launch.
+
+**LanguageManager.** Singleton in `Extensions.swift`. Holds:
+- `customBundle: Bundle?` — non-nil when user explicitly picked a non-English locale
+- `effectiveLanguage: String` — the picked code, or `""` for System Default
+- `systemDefaultLang: String` — snapshot of `Bundle.main.preferredLocalizations.first` at app launch (used for System Default mode's English detection, since Bundle.main is frozen)
+- `isEnglish: Bool` — true if `effectiveLanguage == "en"` OR (System Default AND systemDefaultLang is English)
+- `setLanguage(_ code: String?)` — swap customBundle + write AppleLanguages + post `.languageDidChange`
+
+**Live language switch (no relaunch).** Flow when user picks a language in Preferences:
+1. `LanguagePicker.languageChanged(_:)` calls `LanguageManager.shared.setLanguage(code)`
+2. LanguageManager swaps `customBundle`, writes `AppleLanguages = [code]`, posts `.languageDidChange`
+3. LanguagePicker rebuilds main menu: `NSApp.mainMenu = nil; MenuManager.setupMainMenu()`
+4. `PreferencesWindowController.handleLanguageChange` (notification observer) rebuilds its tabs + toolbar in place via `rebuildTabs(selectedId:)`, preserving the currently-selected tab. Window stays open
+5. `AppDelegate.languageDidChange` (notification observer) nils `inspectorController` + `videoEQController` — floating panels bake L() at init time and don't have refresh logic, so next-open builds fresh
+6. Other UI is dynamic (filename in title bar, OSD messages, dialog text, time labels) or icon-based (control bar buttons) — picks up new language on next render with no extra work
+
+**TabDef pattern.** `PreferencesWindowController.TabDef` separates `id` (stable English, never changes — used as NSTabViewItem + NSToolbarItem identifier) from `label` (localized via `L()`, shown to user). The toolbar identifier MUST stay stable across locales or toolbar selection state breaks on language switch. Same pattern would apply to any toolbar/tab UI in the future.
+
+**Endonym picker.** `LanguagePicker.languages` lists each language by its own endonym (English, 简体中文, 廣東話, 日本語, Русский, …) rather than translating the language name with the rest of the UI. Essential for recovery — if a user accidentally picks Japanese, "日本語" is still visible in the picker so they can switch back. Translating would make the picker entry disappear in the wrong locale.
+
+**Translation QA workflow.** When adding new keys or auditing existing ones:
+1. Extract per-language `{key, value}` tables from the .xcstrings with a Python script
+2. Spawn one Claude reviewer subagent per language with the table + locale-specific style guidance (Apple macOS conventions, common terminology, format-specifier preservation, proper noun list)
+3. Each agent returns ONLY entries needing correction as JSON
+4. Apply with validation (key exists, old value matches, format specifiers preserved), reject anything that doesn't pass
+5. Real bug caught this way: 5s seek direction (Forward/Backward) was inverted in zh-Hans AND zh-Hant — 向后跳 was labeled "forward". Native reviewer agents both flagged it independently. Always have native reviewers verify direction/sequence words.
+
+**Pitfalls specific to .xcstrings catalogs:**
+- Format specifiers (`%@`, `%d`, `%.1f`, `%%`) must appear in the same positions in every translation. Apple's localization compiler will warn but not error; check Activity log on builds. Some languages reorder placeholders — use `%1$@`, `%2$@` positional form for those (we don't have any yet but be aware)
+- Proper nouns (AirPlay, Chromecast, DLNA, Dolby Vision, HDR, MP4, MOV, FFmpeg, VLC, libvlc, yt-dlp, dB, Hz, Hip-Hop, R&B, Yadif, Bob, Blend) stay untranslated in EVERY locale. Don't let reviewers "translate" them
+- EQ preset names (Bass Booster, Vocal Booster, etc.) translate to local equivalents — match Apple Music conventions per locale. R&B and Hip-Hop are loanwords in most locales; keep as English
+
+### Convert/Stream Window
+
+**Backend.** Uses libvlc's sout (stream output) chain. The transcode media option:
+```
+:sout=#transcode{vcodec=X,acodec=Y,ab=192,channels=2,samplerate=44100}:standard{access=file,mux=Z,dst=PATH}
+```
+Reuses `VLCPlayerEngine.sharedInstance` (libvlc supports multiple concurrent media players on one instance — creating a second instance would double the VLC plugin scan cost ~50ms). The conversion player is headless (we don't call `libvlc_media_player_set_nsobject`).
+
+**12 profiles** in `ConvertStreamWindowController.profiles`, mirroring VLC.app's built-in set (H.264+MP3/MP4, VP80+Vorbis/WebM, Theora+Vorbis/OGG, Theora+FLAC/OGG, MPEG-2+MPGA/TS, WMV+WMA/ASF, DIV3+MP3/ASF, audio-only Vorbis/MP3/MP3-in-MP4/FLAC).
+
+**Progress.** Polled every 500ms via `libvlc_media_player_get_position` (0.0–1.0). ETA computed from elapsed wall time and position. Status label and progress bar update on the same timer.
+
+**CPU/GPU display.** `SystemUsageSampler` at bottom of `ConvertStreamWindowController.swift`:
+- `currentProcessCPUPercent()` — walks our process's threads via `task_threads()` + `thread_info(THREAD_BASIC_INFO)` and sums `cpu_usage / TH_USAGE_SCALE * 100`. 100% = one core saturated; multi-threaded workloads exceed 100%. Matches `top`'s %CPU column
+- `currentGPUPercent()` — walks IORegistry for `IOAccelerator` services, reads `PerformanceStatistics["Device Utilization %"]`. Works on Intel + Apple Silicon. Returns max across services (handles multi-GPU). Fully public IOKit API
+
+**Typical observed values during H.264+MP3 conversion on M-series:**
+- CPU: 30–60% (x264 software encoder is the bottleneck)
+- GPU: 10–20% (VideoToolbox doing the decode side; encode is software)
+
+If you ever want a hardware-encoded profile, the libvlc option is `vcodec=h264_videotoolbox` — different sout chain. Would shift load from CPU to GPU.
+
+**Stream output (network sink) not implemented.** The Stream button shows a "not implemented" alert. Adding it properly needs another dialog for protocol/host/port — out of scope for the initial cut.
+
+**Window layout pitfall.** `statusLabel` and `usageLabel` need explicit bottom anchors to `contentView.bottomAnchor` with padding (`-20pt`). Without bottom constraints they end up flush with the window border (no padding). `goButton` bottom anchor at `-40pt` to leave room for the two text rows beneath the progress bar.
+
+### Performance Tuning History
+
+The numbers cited here were measured on M4 Mac mini against VLC.app 3.0.23 and Movist Pro 2.15.4 with 4K HEVC test files. Important for understanding why some seemingly-trivial settings exist.
+
+**Discovered seek-lag root cause: libvlc `file-caching` default = 1000ms.** Both we and VLC.app showed ~1 second of seek lag on the libvlc engine path — confirmed identical via side-by-side testing. Movist Pro had instant seeks because it uses raw FFmpeg without libvlc's input-buffer layer. Reading `vlc-master/src/libvlc-module.c` confirmed: `add_integer( "file-caching", 1000, …)`. Override with `:file-caching=100` in media options. We also set `:network-caching=300` (default 1000) for streaming.
+
+**AVPlayer seek lag eliminated by `automaticallyWaitsToMinimizeStalling = false`.** Default true makes AVPlayer pause after seeks to refill stall-protection buffer — 100-300ms of perceived lag for local files where buffering protection is wasted work. The previous "smoothSeek with completion-handler coalescing" pattern was actively harmful: on drag, mouseUp's seek waited for mouseDown's seek to VISUALLY settle before starting, doubling perceived lag. Removed the coalescing entirely — AVPlayer already cancels pending seeks when a new `seek(to:)` arrives.
+
+**Per-call-site seek tolerance.** `AVPlayerEngine.seek(by:)` and `seekToFraction(_:)` use `.positiveInfinity` (keyframe seek, ~10ms latency). `seekTo(time:)` uses `CMTimeMakeWithSeconds(0.1, …)` (precise, ~100-500ms). Chapter nav and jump-to-time go through `seekTo(time:)` so they're precise; everything else is keyframe.
+
+**Optimistic time-label update.** `ControlBarView`'s seek slider closure updates the time label IMMEDIATELY to the new fractional position, instead of waiting up to 250ms for the next AVPlayer time-observer fire. Visually the time label and slider thumb now jump in sync — feels instant even on slow large files.
+
+**Fullscreen stutter fix.** `AVPlayerLayer.actions = ["bounds": NSNull(), "position": NSNull(), "frame": NSNull(), "sublayers": NSNull(), "contents": NSNull()]` in `VideoView.setPlayer(_:)`. Without it, the layer animates its bounds in parallel with `NSWindow.toggleFullScreen` and AVPlayer stalls for the ~1-2s cross-animation. Also wraps the sublayer-frame update in `VideoView.layout()` in a `CATransaction { setDisableActions(true) }` block as belt-and-suspenders.
+
+**MKV file-open latency: async DV probe.** `PlayerViewController.openFile` previously called `FFmpegBridge.probeFile()` synchronously on main thread for non-native files, blocking the UI for 100-300ms on 4K files (`avformat_find_stream_info` reads packets to detect codecs). Now wraps in `DispatchQueue.global(qos: .userInitiated).async` with a `currentFileURL == url` guard for race protection. Engine selection extracted into per-engine helpers (`startAVPlayerEngine`, `startDolbyVisionRemuxFlow`, `startVLCEngine`).
+
+**Architecture trade-off vs Movist Pro (for context).** Movist Pro uses pure FFmpeg + VideoToolbox + Metal — no libvlc, no AVPlayer for non-native. Its seek and frame timing are slightly better than ours BECAUSE it owns the entire pipeline. Our dual-engine (AVPlayer + libvlc) approach is the pragmatic choice for codec breadth at low engineering cost (~600 lines of libvlc wrapper vs ~3000 lines to build a Movist-style pipeline). After all the tuning above, we're within ~50-100ms of Movist Pro on every metric we measured, which is good enough.
 
 ### Git Repository
 - Repo: https://github.com/zhaomin1995/video_player
