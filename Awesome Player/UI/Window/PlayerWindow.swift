@@ -37,6 +37,10 @@ class PlayerWindow: NSWindow {
         registerForDraggedTypes([.fileURL])
     }
 
+    // NSDraggingDestination protocol methods (not NSWindow overrides — the
+    // protocol is conformed to dynamically, so `override` would not compile).
+    // AppKit dispatches these by selector via the Obj-C runtime when
+    // `registerForDraggedTypes` is called on the window (see init above).
     func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) else { return [] }
         return .copy
