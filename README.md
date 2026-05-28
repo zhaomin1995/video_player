@@ -1,9 +1,13 @@
 # Awesome Player
 
-[![Download](https://img.shields.io/github/v/release/zhaomin1995/video_player?label=Download&logo=apple&logoColor=white&color=000000&style=for-the-badge)](https://github.com/zhaomin1995/video_player/releases/latest)
-[![macOS](https://img.shields.io/badge/macOS-14%2B-007AFF?logo=apple&logoColor=white&style=for-the-badge)](https://github.com/zhaomin1995/video_player/releases/latest)
-[![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white&style=for-the-badge)](https://swift.org)
-[![Languages](https://img.shields.io/badge/i18n-11%20languages-8A2BE2?style=for-the-badge)](https://github.com/zhaomin1995/video_player#download-prebuilt)
+[![Latest Release](https://img.shields.io/github/v/release/zhaomin1995/video_player?label=Latest&logo=apple&logoColor=white&color=000000)](https://github.com/zhaomin1995/video_player/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/zhaomin1995/video_player/total?label=Downloads&logo=github&color=brightgreen)](https://github.com/zhaomin1995/video_player/releases)
+[![macOS](https://img.shields.io/badge/macOS-14%2B-007AFF?logo=apple&logoColor=white)](https://github.com/zhaomin1995/video_player/releases/latest)
+[![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)](https://swift.org)
+[![i18n](https://img.shields.io/badge/i18n-11_languages-8A2BE2)](https://github.com/zhaomin1995/video_player#download-prebuilt)
+[![Last Commit](https://img.shields.io/github/last-commit/zhaomin1995/video_player?label=Updated&logo=git&logoColor=white)](https://github.com/zhaomin1995/video_player/commits/main)
+[![Stars](https://img.shields.io/github/stars/zhaomin1995/video_player?logo=github&color=yellow)](https://github.com/zhaomin1995/video_player/stargazers)
+[![Code Size](https://img.shields.io/github/languages/code-size/zhaomin1995/video_player?logo=swift&logoColor=white&label=Code)](https://github.com/zhaomin1995/video_player)
 
 A full-featured macOS video player that combines **Dolby Vision** playback with **VLC-quality codec support** — instant MKV playback, AirPlay streaming, Chromecast casting, DLNA, and a polished Movist Pro-style UI. Built entirely with AppKit (no storyboards), AVFoundation, libvlc, and FFmpeg.
 
