@@ -687,6 +687,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				// Xcode 26 auto-enables a debug-launcher dylib when a unit-test
+				// target depends on this app; the resulting .debug.dylib lives
+				// in Contents/MacOS but the test bundle's @rpath doesn't find
+				// it, breaking xctest direct loads. We don't use iterative test
+				// hot-reload, so disable.
+				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -729,6 +735,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				// Xcode 26 auto-enables a debug-launcher dylib when a unit-test
+				// target depends on this app; the resulting .debug.dylib lives
+				// in Contents/MacOS but the test bundle's @rpath doesn't find
+				// it, breaking xctest direct loads. We don't use iterative test
+				// hot-reload, so disable.
+				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
