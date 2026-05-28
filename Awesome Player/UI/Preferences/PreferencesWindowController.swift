@@ -3,17 +3,35 @@ import Cocoa
 class PreferencesWindowController: NSWindowController {
     private let tabView = NSTabView()
 
-    private let tabs: [(String, String, NSColor, NSView)] = [
-        ("General", "gearshape.fill", .systemGray, GeneralPrefsView()),
-        ("Open", "doc.badge.plus", .systemBlue, MediaOpenPrefsView()),
-        ("Playback", "play.circle.fill", .systemGreen, PlaybackPrefsView()),
-        ("Video", "film.fill", .systemPurple, VideoPrefsView()),
-        ("Audio", "speaker.wave.3.fill", .systemPink, AudioPrefsView()),
-        ("Subtitle", "captions.bubble.fill", .systemTeal, SubtitlePrefsView()),
-        ("Screen", "arrow.up.left.and.arrow.down.right", .systemIndigo, FullScreenPrefsView()),
-        ("Input", "keyboard.fill", .systemBrown, InputPrefsView()),
-        ("Cast", "tv.fill", .systemRed, CastPrefsView()),
-    ]
+    /// Stable identifier (English, never changes) + dynamic localized label +
+    /// SF Symbol name + tint color. The freshly-built view is rebuilt on each
+    /// rebuildTabs() call so its labels are baked with the current locale's
+    /// L() values. The English `id` is used as the NSTabViewItem identifier
+    /// and the NSToolbarItem identifier so toolbar selection state stays
+    /// stable across language switches.
+    private struct TabDef {
+        let id: String
+        let label: String
+        let icon: String
+        let color: NSColor
+        let view: NSView
+    }
+
+    private var tabs: [TabDef] = []
+
+    private static func makeTabs() -> [TabDef] {
+        [
+            TabDef(id: "General",  label: L("General"),  icon: "gearshape.fill",                       color: .systemGray,   view: GeneralPrefsView()),
+            TabDef(id: "Open",     label: L("Open"),     icon: "doc.badge.plus",                       color: .systemBlue,   view: MediaOpenPrefsView()),
+            TabDef(id: "Playback", label: L("Playback"), icon: "play.circle.fill",                     color: .systemGreen,  view: PlaybackPrefsView()),
+            TabDef(id: "Video",    label: L("Video"),    icon: "film.fill",                            color: .systemPurple, view: VideoPrefsView()),
+            TabDef(id: "Audio",    label: L("Audio"),    icon: "speaker.wave.3.fill",                  color: .systemPink,   view: AudioPrefsView()),
+            TabDef(id: "Subtitle", label: L("Subtitle"), icon: "captions.bubble.fill",                 color: .systemTeal,   view: SubtitlePrefsView()),
+            TabDef(id: "Screen",   label: L("Screen"),   icon: "arrow.up.left.and.arrow.down.right",   color: .systemIndigo, view: FullScreenPrefsView()),
+            TabDef(id: "Input",    label: L("Input"),    icon: "keyboard.fill",                        color: .systemBrown,  view: InputPrefsView()),
+            TabDef(id: "Cast",     label: L("Cast"),     icon: "tv.fill",                              color: .systemRed,    view: CastPrefsView()),
+        ]
+    }
 
     init() {
         let window = NSWindow(
@@ -22,44 +40,14 @@ class PreferencesWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "General"
         window.titleVisibility = .visible
         window.center()
         super.init(window: window)
-        setupTabs()
-
-        DispatchQueue.main.async { [weak self] in
-            self?.resizeWindowToFitTab(animated: false)
-        }
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private func setupTabs() {
-        let toolbar = NSToolbar(identifier: "PrefsToolbar")
-        toolbar.delegate = self
-        toolbar.displayMode = .iconAndLabel
-        toolbar.allowsUserCustomization = false
-        toolbar.centeredItemIdentifiers = Set(tabs.map { NSToolbarItem.Identifier($0.0) })
-        window?.toolbar = toolbar
-        window?.toolbarStyle = .preference
 
         tabView.translatesAutoresizingMaskIntoConstraints = false
         tabView.tabViewType = .noTabsNoBorder
-        window?.contentView?.addSubview(tabView)
-
-        for (i, (name, _, _, view)) in tabs.enumerated() {
-            let item = NSTabViewItem(identifier: name)
-            item.label = name
-            item.view = view
-            tabView.addTabViewItem(item)
-
-            if i == 0 {
-                toolbar.selectedItemIdentifier = NSToolbarItem.Identifier(name)
-            }
-        }
-
-        if let contentView = window?.contentView {
+        window.contentView?.addSubview(tabView)
+        if let contentView = window.contentView {
             NSLayoutConstraint.activate([
                 tabView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
                 tabView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
@@ -67,17 +55,69 @@ class PreferencesWindowController: NSWindowController {
                 tabView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             ])
         }
+
+        rebuildTabs(selectedId: "General")
+
+        DispatchQueue.main.async { [weak self] in
+            self?.resizeWindowToFitTab(animated: false)
+        }
+
+        // Live-refresh in place on language change instead of forcing the
+        // window to close. AppDelegate's cached preferencesController stays
+        // valid; only the views and toolbar items get re-instantiated.
+        NotificationCenter.default.addObserver(self, selector: #selector(handleLanguageChange),
+                                                name: .languageDidChange, object: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    @objc private func handleLanguageChange() {
+        let selectedId = tabView.selectedTabViewItem?.identifier as? String ?? "General"
+        rebuildTabs(selectedId: selectedId)
+    }
+
+    /// Builds tab content + toolbar from a fresh `makeTabs()`. Safe to call
+    /// multiple times — previous tab items are removed first. The toolbar is
+    /// rebuilt with a new NSToolbar instance because NSToolbar caches item
+    /// titles internally and there's no public API to refresh them in place.
+    private func rebuildTabs(selectedId: String) {
+        tabs = Self.makeTabs()
+
+        // Wipe and re-add tab items
+        for item in tabView.tabViewItems.reversed() {
+            tabView.removeTabViewItem(item)
+        }
+        var selectedIndex = 0
+        for (i, tab) in tabs.enumerated() {
+            let item = NSTabViewItem(identifier: tab.id)
+            item.label = tab.label
+            item.view = tab.view
+            tabView.addTabViewItem(item)
+            if tab.id == selectedId { selectedIndex = i }
+        }
+        tabView.selectTabViewItem(at: selectedIndex)
+
+        // Rebuild toolbar so localized labels appear on the toolbar items
+        let toolbar = NSToolbar(identifier: "PrefsToolbar")
+        toolbar.delegate = self
+        toolbar.displayMode = .iconAndLabel
+        toolbar.allowsUserCustomization = false
+        toolbar.centeredItemIdentifiers = Set(tabs.map { NSToolbarItem.Identifier($0.id) })
+        window?.toolbar = toolbar
+        window?.toolbarStyle = .preference
+        toolbar.selectedItemIdentifier = NSToolbarItem.Identifier(tabs[selectedIndex].id)
+
+        window?.title = tabs[selectedIndex].label
     }
 
     @objc private func tabClicked(_ sender: NSToolbarItem) {
-        for (i, (name, _, _, _)) in tabs.enumerated() {
-            if name == sender.itemIdentifier.rawValue {
-                tabView.selectTabViewItem(at: i)
-                window?.title = name
-                resizeWindowToFitTab(animated: true)
-                break
-            }
-        }
+        guard let tab = tabs.first(where: { $0.id == sender.itemIdentifier.rawValue }),
+              let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
+        tabView.selectTabViewItem(at: index)
+        window?.title = tab.label
+        resizeWindowToFitTab(animated: true)
     }
 
     private func resizeWindowToFitTab(animated: Bool) {
@@ -128,24 +168,24 @@ class PreferencesWindowController: NSWindowController {
 
 extension PreferencesWindowController: NSToolbarDelegate {
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        tabs.map { NSToolbarItem.Identifier($0.0) }
+        tabs.map { NSToolbarItem.Identifier($0.id) }
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        tabs.map { NSToolbarItem.Identifier($0.0) }
+        tabs.map { NSToolbarItem.Identifier($0.id) }
     }
 
     func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        tabs.map { NSToolbarItem.Identifier($0.0) }
+        tabs.map { NSToolbarItem.Identifier($0.id) }
     }
 
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        guard let tab = tabs.first(where: { $0.0 == itemIdentifier.rawValue }) else { return nil }
+        guard let tab = tabs.first(where: { $0.id == itemIdentifier.rawValue }) else { return nil }
         let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-        item.label = tab.0
+        item.label = tab.label
         let config = NSImage.SymbolConfiguration(pointSize: 18, weight: .regular)
-            .applying(NSImage.SymbolConfiguration(paletteColors: [tab.2]))
-        item.image = NSImage(systemSymbolName: tab.1, accessibilityDescription: tab.0)?
+            .applying(NSImage.SymbolConfiguration(paletteColors: [tab.color]))
+        item.image = NSImage(systemSymbolName: tab.icon, accessibilityDescription: tab.label)?
             .withSymbolConfiguration(config)
         item.image?.isTemplate = false
         item.target = self
@@ -244,13 +284,11 @@ final class LanguagePicker: NSObject {
         NSApplication.shared.mainMenu = nil
         MenuManager.setupMainMenu()
 
-        // The preferences window itself was built with the old strings; close
-        // it so reopening picks up the new locale. Other UI in the app is
-        // either dynamic (OSD messages, dialogs, filename titles) or made of
-        // icons, so it'll display correctly without further action.
-        if let win = sender.window {
-            DispatchQueue.main.async { win.performClose(nil) }
-        }
+        // The Preferences window itself observes .languageDidChange and
+        // rebuilds its tabs / toolbar in place (PreferencesWindowController
+        // .handleLanguageChange), so we don't need to close it. The rest of
+        // the app's UI is either dynamic or icon-based — picks up the new
+        // language on the next render with no extra work.
     }
 }
 

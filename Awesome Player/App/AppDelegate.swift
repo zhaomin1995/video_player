@@ -48,7 +48,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func languageDidChange() {
-        preferencesController = nil
+        // PreferencesWindowController refreshes itself in place via its own
+        // .languageDidChange observer — no need to drop the cached instance.
+        // Floating panels (Inspector, Video EQ) bake L() labels at init time
+        // and don't yet have refresh logic; dropping them means the next
+        // open builds fresh views with the new locale.
         inspectorController = nil
         videoEQController = nil
     }
