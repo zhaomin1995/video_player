@@ -109,6 +109,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         windowController?.playerViewController.saveCurrentPosition()
         UserDefaults.standard.removeObserver(self, forKeyPath: Defaults.theme)
+        // Mirror the addObserver in applicationDidFinishLaunching so observer
+        // bookkeeping stays consistent if terminate is ever cancelled by a
+        // save panel and the app continues running.
+        NotificationCenter.default.removeObserver(self, name: .languageDidChange, object: nil)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

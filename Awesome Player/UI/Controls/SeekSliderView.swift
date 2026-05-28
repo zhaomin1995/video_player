@@ -42,6 +42,14 @@ class SeekSliderView: NSView {
 
     var currentAsset: AVAsset? {
         didSet {
+            // Cancel any in-flight thumbnail jobs against the prior asset
+            // BEFORE clearing the cache or swapping the generator. Without
+            // this, a job submitted against the old asset can complete after
+            // the new asset is set and write its result into the (now-fresh)
+            // cache with a key valid against the new asset's time domain —
+            // showing a stale thumbnail for one tooltip cycle.
+            imageGenerator?.cancelAllCGImageGeneration()
+            pendingThumbnailTime = nil
             thumbnailCache.removeAllObjects()
             if let asset = currentAsset {
                 let gen = AVAssetImageGenerator(asset: asset)
