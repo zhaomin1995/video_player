@@ -55,8 +55,8 @@ Vendor/
 The fast iteration loop. Build artifacts land in Xcode's DerivedData:
 
 ```bash
-git clone https://github.com/zhaomin1995/video_player.git
-cd video_player
+git clone https://github.com/zhaomin1995/awesome_player.git
+cd awesome_player
 open "Awesome Player.xcodeproj"
 # Cmd+R in Xcode to build and run
 ```
@@ -74,7 +74,7 @@ This is *only* useful while developing. The path is deep, the binary is unoptimi
 A Release configuration build is what you want when you're "done iterating" and want a stable copy in `/Applications`:
 
 ```bash
-cd video_player
+cd awesome_player
 xcodebuild -project "Awesome Player.xcodeproj" \
            -scheme "Awesome Player" \
            -configuration Release \
@@ -119,13 +119,13 @@ cd "$(dirname "$RELEASE_APP")"
 ditto -c -k --keepParent "Awesome Player.app" /tmp/Awesome-Player-<version>.zip
 
 # 3. Create the GitHub release with the zip attached
-cd /path/to/video_player
+cd /path/to/awesome_player
 gh release create v<version> /tmp/Awesome-Player-<version>.zip \
     --title "Awesome Player <version>" \
     --notes "..."
 ```
 
-The first release was `v1.0` at https://github.com/zhaomin1995/video_player/releases/tag/v1.0 — use that release notes body as a template for future versions. Users download the zip, unzip, drag to `/Applications`, right-click → Open the first time to bypass ad-hoc signing warning.
+The first release was `v1.0` at https://github.com/zhaomin1995/awesome_player/releases/tag/v1.0 — use that release notes body as a template for future versions. Users download the zip, unzip, drag to `/Applications`, right-click → Open the first time to bypass ad-hoc signing warning.
 
 **Why `ditto` and not `zip`:** macOS app bundles contain symlinks (Frameworks → Versions/A, etc.) and resource forks that regular `zip` mangles, producing a `.app` that crashes on launch with `dyld` errors. `ditto -c -k --keepParent` is Apple's officially-blessed tool for archiving `.app` bundles.
 
@@ -421,5 +421,5 @@ The numbers cited here were measured on M4 Mac mini against VLC.app 3.0.23 and M
 **Architecture trade-off vs Movist Pro (for context).** Movist Pro uses pure FFmpeg + VideoToolbox + Metal — no libvlc, no AVPlayer for non-native. Its seek and frame timing are slightly better than ours BECAUSE it owns the entire pipeline. Our dual-engine (AVPlayer + libvlc) approach is the pragmatic choice for codec breadth at low engineering cost (~600 lines of libvlc wrapper vs ~3000 lines to build a Movist-style pipeline). After all the tuning above, we're within ~50-100ms of Movist Pro on every metric we measured, which is good enough.
 
 ### Git Repository
-- Repo: https://github.com/zhaomin1995/video_player
+- Repo: https://github.com/zhaomin1995/awesome_player
 - Branch: main

@@ -1,17 +1,17 @@
 # Awesome Player
 
-[![Latest Release](https://img.shields.io/github/v/release/zhaomin1995/video_player?label=Latest&logo=apple&logoColor=white&color=000000)](https://github.com/zhaomin1995/video_player/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/zhaomin1995/video_player/total?label=Downloads&logo=github&color=brightgreen)](https://github.com/zhaomin1995/video_player/releases)
-[![macOS](https://img.shields.io/badge/macOS-14%2B-007AFF?logo=apple&logoColor=white)](https://github.com/zhaomin1995/video_player/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/zhaomin1995/awesome_player?label=Latest&logo=apple&logoColor=white&color=000000)](https://github.com/zhaomin1995/awesome_player/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/zhaomin1995/awesome_player/total?label=Downloads&logo=github&color=brightgreen)](https://github.com/zhaomin1995/awesome_player/releases)
+[![macOS](https://img.shields.io/badge/macOS-14%2B-007AFF?logo=apple&logoColor=white)](https://github.com/zhaomin1995/awesome_player/releases/latest)
 [![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)](https://swift.org)
-[![i18n](https://img.shields.io/badge/i18n-11_languages-8A2BE2)](https://github.com/zhaomin1995/video_player#download-prebuilt)
-[![Last Commit](https://img.shields.io/github/last-commit/zhaomin1995/video_player?label=Updated&logo=git&logoColor=white)](https://github.com/zhaomin1995/video_player/commits/main)
-[![Stars](https://img.shields.io/github/stars/zhaomin1995/video_player?logo=github&color=yellow)](https://github.com/zhaomin1995/video_player/stargazers)
-[![Code Size](https://img.shields.io/github/languages/code-size/zhaomin1995/video_player?logo=swift&logoColor=white&label=Code)](https://github.com/zhaomin1995/video_player)
+[![i18n](https://img.shields.io/badge/i18n-11_languages-8A2BE2)](https://github.com/zhaomin1995/awesome_player#download-prebuilt)
+[![Last Commit](https://img.shields.io/github/last-commit/zhaomin1995/awesome_player?label=Updated&logo=git&logoColor=white)](https://github.com/zhaomin1995/awesome_player/commits/main)
+[![Stars](https://img.shields.io/github/stars/zhaomin1995/awesome_player?logo=github&color=yellow)](https://github.com/zhaomin1995/awesome_player/stargazers)
+[![Code Size](https://img.shields.io/github/languages/code-size/zhaomin1995/awesome_player?logo=swift&logoColor=white&label=Code)](https://github.com/zhaomin1995/awesome_player)
 
 A full-featured macOS video player that combines **Dolby Vision** playback with **VLC-quality codec support** — instant MKV playback, AirPlay streaming, Chromecast casting, DLNA, and a polished Movist Pro-style UI. Built entirely with AppKit (no storyboards), AVFoundation, libvlc, and FFmpeg.
 
-> **Latest: [v1.0](https://github.com/zhaomin1995/video_player/releases/tag/v1.0)** — first public Release build. Download `Awesome-Player-1.0.zip` (~100 MB), unzip, drag into `/Applications`, and you're playing video in 30 seconds.
+> **Latest: [v1.0](https://github.com/zhaomin1995/awesome_player/releases/tag/v1.0)** — first public Release build. Download `Awesome-Player-1.0.zip` (~100 MB), unzip, drag into `/Applications`, and you're playing video in 30 seconds.
 
 ## Features
 
@@ -126,9 +126,9 @@ A full-featured macOS video player that combines **Dolby Vision** playback with 
 
 | Version | macOS  | Size    | Download                                                                                                                  |
 |---------|--------|---------|---------------------------------------------------------------------------------------------------------------------------|
-| **1.0** | 14.0+  | 101 MB  | [**Awesome-Player-1.0.zip**](https://github.com/zhaomin1995/video_player/releases/download/v1.0/Awesome-Player-1.0.zip)   |
+| **1.0** | 14.0+  | 101 MB  | [**Awesome-Player-1.0.zip**](https://github.com/zhaomin1995/awesome_player/releases/download/v1.0/Awesome-Player-1.0.zip)   |
 
-All releases: [github.com/zhaomin1995/video_player/releases](https://github.com/zhaomin1995/video_player/releases)
+All releases: [github.com/zhaomin1995/awesome_player/releases](https://github.com/zhaomin1995/awesome_player/releases)
 
 ### Install
 
@@ -141,8 +141,8 @@ No installer, no Homebrew, no extra downloads — FFmpeg, libvlc, yt-dlp, and a 
 ## Build from source
 
 ```bash
-git clone https://github.com/zhaomin1995/video_player.git
-cd video_player
+git clone https://github.com/zhaomin1995/awesome_player.git
+cd awesome_player
 open "Awesome Player.xcodeproj"
 # Press Cmd+R in Xcode to build and run
 ```
